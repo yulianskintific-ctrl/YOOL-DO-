@@ -10,17 +10,19 @@ import Filters from "./components/Filters";
 import { MainTrendChart, PerformanceBarChart, ComparisonLineChart, BrandDoughnutChart } from "./components/Charts";
 import RankingTable from "./components/RankingTable";
 import ContributionTable from "./components/ContributionTable";
-import { SalesData, FilterState, SidebarMenu, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData } from "./types";
-import { fetchSalesData, fetchIncentiveSPVData, fetchIncentiveSPVExclusiveData, fetchIncentiveSEData } from "./services/api";
+import { SalesData, FilterState, SidebarMenu, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData } from "./types";
+import { fetchSalesData, fetchIncentiveSPVData, fetchIncentiveSPVExclusiveData, fetchIncentiveSEData, fetchSellOutData } from "./services/api";
 import { formatNumber, cn } from "./lib/utils";
 import { parse, format, eachMonthOfInterval } from "date-fns";
 import { Loader2, X, RefreshCw } from "lucide-react";
 import IncentivesSPVTable from "./components/IncentivesSPVTable";
 import IncentivesSPVExclusiveTable from "./components/IncentivesSPVExclusiveTable";
 import IncentivesSETable from "./components/IncentivesSETable";
+import SellOutDashboard from "./components/SellOutDashboard";
 
 export default function App() {
   const [data, setData] = useState<SalesData[]>([]);
+  const [sellOutData, setSellOutData] = useState<SellOutData[]>([]);
   const [incentivesData, setIncentivesData] = useState<IncentiveSPVData[]>([]);
   const [exclusiveIncentivesData, setExclusiveIncentivesData] = useState<IncentiveSPVExclusiveData[]>([]);
   const [seIncentivesData, setSeIncentivesData] = useState<IncentiveSEData[]>([]);
@@ -39,7 +41,11 @@ export default function App() {
     supervisors: [],
     distributors: [],
     distributorCompanies: [],
-    distributorBranches: []
+    distributorBranches: [],
+    channels: [],
+    categories: [],
+    segments: [],
+    baStoreNonBaStores: []
   });
 
   useEffect(() => {
@@ -49,6 +55,8 @@ export default function App() {
       loadExclusiveIncentivesData();
     } else if (activeMenu === 'Incentives SE') {
       loadSeIncentivesData();
+    } else if (activeMenu === 'Sell Out') {
+      loadSellOutData();
     } else {
       const dashboardMenus: SidebarMenu[] = ['Sell In', 'Sell Through'];
       if (dashboardMenus.includes(activeMenu)) {
@@ -129,6 +137,24 @@ export default function App() {
     }
   }
 
+  async function loadSellOutData(force = false) {
+    try {
+      if (force) setRefreshing(true);
+      else setLoading(true);
+      
+      setError(null);
+      setLoadingStatus("Synchronizing Sell Out records from Google Sheets...");
+      const result = await fetchSellOutData(force);
+      setSellOutData(result);
+    } catch (err) {
+      console.error("Sell Out Load Error:", err);
+      setError(`Failed to synchronize ${activeMenu} data. Please check your Script URL.`);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
   const handleFilterChange = (key: keyof FilterState, value: string | string[]) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -158,16 +184,32 @@ export default function App() {
       };
     }
 
-    if (!data.length) return { brands: [], regions: [], asms: [], supervisors: [], distributors: [] };
+    if (activeMenu === 'Sell Out') {
+      if (!sellOutData.length) return { brands: [], regions: [], asms: [], supervisors: [], distributors: [], channels: [], categories: [], segments: [], baStoreNonBaStores: [] };
+      return {
+        brands: Array.from(new Set(sellOutData.map((d) => d.brand_of))).sort(),
+        regions: Array.from(new Set(sellOutData.map((d) => d.region))).sort(),
+        asms: [],
+        supervisors: [],
+        distributors: [],
+        channels: Array.from(new Set(sellOutData.map((d) => d.channel))).sort(),
+        categories: Array.from(new Set(sellOutData.map((d) => d.category))).sort(),
+        segments: Array.from(new Set(sellOutData.map((d) => d.segment))).sort(),
+        baStoreNonBaStores: Array.from(new Set(sellOutData.map((d) => d.ba_store_non_ba_store).filter(Boolean) as string[])).sort()
+      };
+    }
+
+    const currentSalesDataset = data;
+    if (!currentSalesDataset.length) return { brands: [], regions: [], asms: [], supervisors: [], distributors: [] };
     
     return {
-      brands: Array.from(new Set(data.map((d) => d.brand_of))).sort(),
-      regions: Array.from(new Set(data.map((d) => d.region))).sort(),
-      asms: Array.from(new Set(data.map((d) => d.asm))).sort(),
-      supervisors: Array.from(new Set(data.map((d) => d.supervisor))).sort(),
-      distributors: Array.from(new Set(data.map((d) => d.distributor_name))).sort()
+      brands: Array.from(new Set(currentSalesDataset.map((d) => d.brand_of))).sort(),
+      regions: Array.from(new Set(currentSalesDataset.map((d) => d.region))).sort(),
+      asms: Array.from(new Set(currentSalesDataset.map((d) => d.asm))).sort(),
+      supervisors: Array.from(new Set(currentSalesDataset.map((d) => d.supervisor))).sort(),
+      distributors: Array.from(new Set(currentSalesDataset.map((d) => d.distributor_name))).sort()
     };
-  }, [data, incentivesData, exclusiveIncentivesData, activeMenu]);
+  }, [data, sellOutData, incentivesData, exclusiveIncentivesData, activeMenu]);
 
   const filteredIncentivesData = useMemo(() => {
     if (activeMenu !== 'Incentives SPV Internal') return [];
@@ -192,6 +234,18 @@ export default function App() {
   }, [exclusiveIncentivesData, filters, activeMenu]);
 
   const baseFilteredData = useMemo(() => {
+    if (activeMenu === 'Sell Out') {
+      return sellOutData.filter((d) => {
+        if (filters.brands.length > 0 && !filters.brands.includes(d.brand_of)) return false;
+        if (filters.regions.length > 0 && !filters.regions.includes(d.region)) return false;
+        if (filters.channels && filters.channels.length > 0 && !filters.channels.includes(d.channel)) return false;
+        if (filters.categories && filters.categories.length > 0 && !filters.categories.includes(d.category)) return false;
+        if (filters.segments && filters.segments.length > 0 && !filters.segments.includes(d.segment)) return false;
+        if (filters.baStoreNonBaStores && filters.baStoreNonBaStores.length > 0 && d.ba_store_non_ba_store && !filters.baStoreNonBaStores.includes(d.ba_store_non_ba_store)) return false;
+        return true;
+      });
+    }
+
     return data.filter((d) => {
       if (filters.brands.length > 0 && !filters.brands.includes(d.brand_of)) return false;
       if (filters.regions.length > 0 && !filters.regions.includes(d.region)) return false;
@@ -200,7 +254,7 @@ export default function App() {
       if (filters.distributors.length > 0 && !filters.distributors.includes(d.distributor_name)) return false;
       return true;
     });
-  }, [data, filters, activeMenu]);
+  }, [data, sellOutData, filters, activeMenu]);
 
   const filteredData = useMemo(() => {
     return baseFilteredData.filter((d) => {
@@ -222,16 +276,24 @@ export default function App() {
       return { totalValue: totalIncentives, mtdValue: 0, growthLM: 0, growthLY: 0, incentiveSPVInternal: 0, spvExclusive: totalIncentives, seIncentive: 0, uniqueDistributors: 0, topBrand: 'N/A', topASM: 'N/A' };
     }
 
-    const valueKey = (activeMenu === 'Sell In' || activeMenu === 'PO Checker') ? 'sell_in_value' : 'sell_through_value';
-    const totalValue = filteredData.reduce((sum, d) => sum + (d[valueKey] || 0), 0);
-    const uniqueDistributors = new Set(filteredData.map((d) => d.distributor_name)).size;
+    const valueKey = (activeMenu === 'Sell In' || activeMenu === 'PO Checker') 
+      ? 'sell_in_value' 
+      : (activeMenu === 'Sell Out' ? 'sell_out_value' : 'sell_through_value');
+    const totalValue = filteredData.reduce((sum, d) => sum + ((d as any)[valueKey] || 0), 0);
+    const uniqueDistributors = activeMenu === 'Sell Out'
+      ? new Set(filteredData.map((d) => (d as any).segment)).size
+      : new Set(filteredData.map((d) => (d as any).distributor_name)).size;
     
     const brandPerf: Record<string, number> = {};
     const asmPerf: Record<string, number> = {};
     
     filteredData.forEach((d) => {
-      brandPerf[d.brand_of] = (brandPerf[d.brand_of] || 0) + (d[valueKey] || 0);
-      asmPerf[d.asm] = (asmPerf[d.asm] || 0) + (d[valueKey] || 0);
+      brandPerf[d.brand_of] = (brandPerf[d.brand_of] || 0) + ((d as any)[valueKey] || 0);
+      if (activeMenu === 'Sell Out') {
+        asmPerf[(d as any).category || 'N/A'] = (asmPerf[(d as any).category || 'N/A'] || 0) + ((d as any)[valueKey] || 0);
+      } else {
+        asmPerf[(d as any).asm] = (asmPerf[(d as any).asm] || 0) + ((d as any)[valueKey] || 0);
+      }
     });
 
     const topBrand = Object.entries(brandPerf).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
@@ -241,7 +303,7 @@ export default function App() {
     let growthLM = 0;
     let growthLY = 0;
 
-    const isSalesMenu = activeMenu === 'Sell In' || activeMenu === 'Sell Through';
+    const isSalesMenu = activeMenu === 'Sell In' || activeMenu === 'Sell Through' || activeMenu === 'Sell Out';
 
     if (isSalesMenu) {
       const sortedData = [...filteredData].sort((a, b) => new Date(b.calendar_date).getTime() - new Date(a.calendar_date).getTime());
@@ -268,9 +330,9 @@ export default function App() {
           return dDate.getMonth() === latestMonth && dDate.getFullYear() === latestYear - 1;
         });
 
-        mtdValue = currentMonthData.reduce((sum, d) => sum + d[valueKey], 0);
-        const lmValue = lastMonthData.reduce((sum, d) => sum + d[valueKey], 0);
-        const lyValue = lastYearData.reduce((sum, d) => sum + d[valueKey], 0);
+        mtdValue = currentMonthData.reduce((sum, d) => sum + (d as any)[valueKey], 0);
+        const lmValue = lastMonthData.reduce((sum, d) => sum + (d as any)[valueKey], 0);
+        const lyValue = lastYearData.reduce((sum, d) => sum + (d as any)[valueKey], 0);
 
         growthLM = lmValue ? parseFloat(((mtdValue - lmValue) / lmValue * 100).toFixed(0)) : 0;
         growthLY = lyValue ? parseFloat(((mtdValue - lyValue) / lyValue * 100).toFixed(0)) : 0;
@@ -288,7 +350,8 @@ export default function App() {
   const chartData = useMemo(() => {
     if (!filteredData.length) return [];
     
-    const brands = Array.from(new Set(data.map((d) => d.brand_of)));
+    const currentSalesDataset = activeMenu === 'Sell Out' ? sellOutData : data;
+    const brands = Array.from(new Set(currentSalesDataset.map((d) => d.brand_of)));
     
     // Find min and max date from data to create all months in range
     const dates = filteredData.map(d => new Date(d.calendar_date));
@@ -317,17 +380,20 @@ export default function App() {
     filteredData.forEach((d) => {
       const month = format(new Date(d.calendar_date), 'MMM yyyy');
       if (activeMenu === 'Sell Through') {
-        monthly[month]['Sell In'] += d.sell_in_value;
-        monthly[month]['Sell Through'] += d.sell_through_value;
+        monthly[month]['Sell In'] += (d as any).sell_in_value;
+        monthly[month]['Sell Through'] += (d as any).sell_through_value;
       } else {
-        monthly[month][d.brand_of] += d.sell_in_value;
+        const val = activeMenu === 'Sell Out' ? ((d as any).sell_out_value || 0) : (d as any).sell_in_value;
+        if (monthly[month] && monthly[month][d.brand_of] !== undefined) {
+          monthly[month][d.brand_of] += val;
+        }
       }
     });
 
     return Object.values(monthly).sort((a, b) => {
       return parse(a.date, 'MMM yyyy', new Date()).getTime() - parse(b.date, 'MMM yyyy', new Date()).getTime();
     });
-  }, [filteredData, data, activeMenu]);
+  }, [filteredData, data, sellOutData, activeMenu]);
 
   const regionData = useMemo(() => {
     const perf: Record<string, any> = {};
@@ -337,26 +403,31 @@ export default function App() {
           name: d.region, 
           value: 0,
           "Sell In": 0,
-          "Sell Through": 0
+          "Sell Through": 0,
+          "Sell Out": 0
         };
       }
       
       if (activeMenu === 'Sell Through') {
-        perf[d.region]["Sell In"] += d.sell_in_value;
-        perf[d.region]["Sell Through"] += d.sell_through_value;
+        perf[d.region]["Sell In"] += (d as any).sell_in_value;
+        perf[d.region]["Sell Through"] += (d as any).sell_through_value;
         perf[d.region].value = perf[d.region]["Sell Through"]; // Base for default sorting
+      } else if (activeMenu === 'Sell Out') {
+        perf[d.region]["Sell Out"] += (d as any).sell_out_value || 0;
+        perf[d.region].value = perf[d.region]["Sell Out"];
       } else {
-        perf[d.region].value += d.sell_in_value;
+        perf[d.region].value += (d as any).sell_in_value;
       }
     });
     return Object.values(perf).sort((a: any, b: any) => b.value - a.value);
   }, [filteredData, activeMenu]);
 
   const topDistributors = useMemo(() => {
-    const valueKey = activeMenu === 'Sell Through' ? 'sell_through_value' : 'sell_in_value';
+    const valueKey = activeMenu === 'Sell Through' ? 'sell_through_value' : (activeMenu === 'Sell Out' ? 'sell_out_value' : 'sell_in_value');
     const perf: Record<string, number> = {};
     filteredData.forEach((d) => {
-      perf[d.distributor_name] = (perf[d.distributor_name] || 0) + d[valueKey];
+      const name = activeMenu === 'Sell Out' ? ((d as any).channel || 'Unknown') : ((d as any).distributor_name || 'Unknown');
+      perf[name] = (perf[name] || 0) + ((d as any)[valueKey] || 0);
     });
     return Object.entries(perf)
       .map(([name, value]) => ({ name, value }))
@@ -365,10 +436,11 @@ export default function App() {
   }, [filteredData, activeMenu]);
 
   const asmRanking = useMemo(() => {
-    const valueKey = activeMenu === 'Sell Through' ? 'sell_through_value' : 'sell_in_value';
+    const valueKey = activeMenu === 'Sell Through' ? 'sell_through_value' : (activeMenu === 'Sell Out' ? 'sell_out_value' : 'sell_in_value');
     const perf: Record<string, number> = {};
     filteredData.forEach((d) => {
-      perf[d.asm] = (perf[d.asm] || 0) + d[valueKey];
+      const name = activeMenu === 'Sell Out' ? ((d as any).category || 'Unknown') : ((d as any).asm || 'Unknown');
+      perf[name] = (perf[name] || 0) + ((d as any)[valueKey] || 0);
     });
     return Object.entries(perf)
       .map(([name, value]) => ({ name, value }))
@@ -376,11 +448,13 @@ export default function App() {
   }, [filteredData, activeMenu]);
 
   const supervisorRanking = useMemo(() => {
-    if (activeMenu !== 'Sell Through') return [];
+    if (activeMenu !== 'Sell Through' && activeMenu !== 'Sell Out') return [];
     
+    const valueKey = activeMenu === 'Sell Out' ? 'sell_out_value' : 'sell_through_value';
     const perf: Record<string, number> = {};
     filteredData.forEach((d) => {
-      perf[d.supervisor] = (perf[d.supervisor] || 0) + d.sell_through_value;
+      const name = activeMenu === 'Sell Out' ? ((d as any).segment || 'Unknown') : ((d as any).supervisor || 'Unknown');
+      perf[name] = (perf[name] || 0) + ((d as any)[valueKey] || 0);
     });
     return Object.entries(perf)
       .map(([name, value]) => ({ name, value }))
@@ -394,6 +468,8 @@ export default function App() {
       loadExclusiveIncentivesData(force);
     } else if (activeMenu === 'Incentives SE') {
       loadSeIncentivesData(force);
+    } else if (activeMenu === 'Sell Out') {
+      loadSellOutData(force);
     } else {
       loadDashboardData(force);
     }
@@ -457,7 +533,7 @@ export default function App() {
 
         {activeMenu !== 'Incentives SE' && <Filters activeMenu={activeMenu} filters={filters} onFilterChange={handleFilterChange} options={options} />}
 
-        {activeMenu !== 'Incentives SPV Internal' && activeMenu !== 'Incentives SPV Exclusive' && activeMenu !== 'Incentives SE' && (
+        {activeMenu !== 'Incentives SPV Internal' && activeMenu !== 'Incentives SPV Exclusive' && activeMenu !== 'Incentives SE' && activeMenu !== 'Sell Out' && (
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <KPICard index={0} label={`Total ${activeMenu}`} value={formatNumber(metrics.totalValue)} prefix="Rp" />
             {(activeMenu === 'Sell In' || activeMenu === 'Sell Through') ? (
@@ -474,6 +550,12 @@ export default function App() {
               </>
             )}
           </section>
+        )}
+
+        {activeMenu === 'Sell Out' && (
+          <div className="mt-8">
+            <SellOutDashboard data={filteredData as SellOutData[]} />
+          </div>
         )}
 
         {(activeMenu === 'Sell In' || activeMenu === 'Sell Through') ? (
@@ -529,8 +611,8 @@ export default function App() {
 
             {activeMenu === 'Sell Through' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                <RankingTable data={asmRanking} title="ASM Ranking (By Sell Through)" />
-                <RankingTable data={supervisorRanking} title="Supervisor Ranking (By Sell Through)" />
+                <RankingTable data={asmRanking} title={`ASM Ranking (By ${activeMenu})`} />
+                <RankingTable data={supervisorRanking} title={`Supervisor Ranking (By ${activeMenu})`} />
               </div>
             )}
 
@@ -547,18 +629,30 @@ export default function App() {
             </section>
           </>
         ) : activeMenu === 'Incentives SPV Internal' ? (
-          <div className="mt-6">
+          <div className="mt-8 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-1 bg-blue-600 rounded-full" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Incentives SPV Internal Performance</h3>
+            </div>
             <IncentivesSPVTable data={filteredIncentivesData} />
           </div>
         ) : activeMenu === 'Incentives SPV Exclusive' ? (
-          <div className="mt-6">
+          <div className="mt-8 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-1 bg-blue-600 rounded-full" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Incentives SPV Exclusive Performance</h3>
+            </div>
             <IncentivesSPVExclusiveTable data={filteredExclusiveIncentivesData} />
           </div>
         ) : activeMenu === 'Incentives SE' ? (
-          <div className="mt-6">
+          <div className="mt-8 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-1 bg-blue-600 rounded-full" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Incentives SE Performance</h3>
+            </div>
             <IncentivesSETable data={seIncentivesData} />
           </div>
-        ) : (
+        ) : activeMenu === 'Sell Out' ? null : (
           <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
               <Loader2 className="w-8 h-8 text-blue-600" />

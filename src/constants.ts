@@ -7,6 +7,7 @@ import { SidebarMenu } from "./types";
 import { 
   BarChart3, 
   TrendingUp, 
+  ShoppingBag,
   Coins, 
   Crown, 
   UserCheck, 
@@ -17,6 +18,7 @@ import {
 export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolean }[] = [
   { name: 'Sell In', icon: BarChart3, isComingSoon: false },
   { name: 'Sell Through', icon: TrendingUp, isComingSoon: false },
+  { name: 'Sell Out', icon: ShoppingBag, isComingSoon: false },
   { name: 'Incentives SPV Internal', icon: Coins, isComingSoon: false },
   { name: 'Incentives SPV Exclusive', icon: Crown, isComingSoon: false },
   { name: 'Incentives SE', icon: UserCheck, isComingSoon: false },

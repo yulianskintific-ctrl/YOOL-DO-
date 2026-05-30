@@ -21,6 +21,10 @@ interface FiltersProps {
     distributors: string[];
     distributorCompanies?: string[];
     distributorBranches?: string[];
+    channels?: string[];
+    categories?: string[];
+    segments?: string[];
+    baStoreNonBaStores?: string[];
   };
 }
 
@@ -215,21 +219,32 @@ export default function Filters({ activeMenu, filters, onFilterChange, options }
       )}
 
       <MultiSelect label="Region" value={filters.regions} onChange={(v) => onFilterChange('regions', v)} options={options.regions} />
-      <MultiSelect label="ASM" value={filters.asms} onChange={(v) => onFilterChange('asms', v)} options={options.asms} />
       
-      {isIncentivesExclusive && (
+      {activeMenu === 'Sell Out' ? (
         <>
-          <MultiSelect label="Distributor Company" value={filters.distributorCompanies} onChange={(v) => onFilterChange('distributorCompanies', v)} options={options.distributorCompanies || []} />
-          <MultiSelect label="Distributor Branch" value={filters.distributorBranches} onChange={(v) => onFilterChange('distributorBranches', v)} options={options.distributorBranches || []} />
+          <MultiSelect label="Channel" value={filters.channels || []} onChange={(v) => onFilterChange('channels', v)} options={options.channels || []} />
+          <MultiSelect label="Category" value={filters.categories || []} onChange={(v) => onFilterChange('categories', v)} options={options.categories || []} />
+          <MultiSelect label="Segment" value={filters.segments || []} onChange={(v) => onFilterChange('segments', v)} options={options.segments || []} />
         </>
-      )}
+      ) : (
+        <>
+          <MultiSelect label="ASM" value={filters.asms} onChange={(v) => onFilterChange('asms', v)} options={options.asms} />
+          
+          {isIncentivesExclusive && (
+            <>
+              <MultiSelect label="Distributor Company" value={filters.distributorCompanies} onChange={(v) => onFilterChange('distributorCompanies', v)} options={options.distributorCompanies || []} />
+              <MultiSelect label="Distributor Branch" value={filters.distributorBranches} onChange={(v) => onFilterChange('distributorBranches', v)} options={options.distributorBranches || []} />
+            </>
+          )}
 
-      {(activeMenu === 'Sell Through' || isAnyIncentiveSPV) && (
-        <MultiSelect label="Supervisor" value={filters.supervisors} onChange={(v) => onFilterChange('supervisors', v)} options={options.supervisors} />
-      )}
+          {(activeMenu === 'Sell Through' || isAnyIncentiveSPV) && (
+            <MultiSelect label="Supervisor" value={filters.supervisors} onChange={(v) => onFilterChange('supervisors', v)} options={options.supervisors} />
+          )}
 
-      {!isAnyIncentiveSPV && (
-        <MultiSelect label="Distributor" value={filters.distributors} onChange={(v) => onFilterChange('distributors', v)} options={options.distributors} />
+          {!isAnyIncentiveSPV && (
+            <MultiSelect label="Distributor" value={filters.distributors} onChange={(v) => onFilterChange('distributors', v)} options={options.distributors} />
+          )}
+        </>
       )}
       
       <button 
@@ -243,6 +258,10 @@ export default function Filters({ activeMenu, filters, onFilterChange, options }
           onFilterChange('distributors', []);
           onFilterChange('distributorCompanies', []);
           onFilterChange('distributorBranches', []);
+          onFilterChange('channels', []);
+          onFilterChange('categories', []);
+          onFilterChange('segments', []);
+          onFilterChange('baStoreNonBaStores', []);
         }}
         className="flex items-center gap-2 group ml-auto pb-2"
       >

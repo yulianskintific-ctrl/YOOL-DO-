@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData } from "../types";
+import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData } from "../types";
 
 /**
  * SALIN & TEMPEL KODE INI KE GOOGLE APPS SCRIPT:
@@ -64,6 +64,11 @@ let lastExclusiveFetchTime = 0;
 export const SE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
 let cachedSEData: IncentiveSEData[] | null = null;
 let lastSEFetchTime = 0;
+
+// URL DEPLOYMENT GOOGLE APPS SCRIPT BARU UNTUK SELL OUT (MENGGUNAKAN SCRIPT & GOOGLE SHEET YANG BERBEDA)
+export const SELL_OUT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyDS6ZPtUffLDNVieh-hCG4e2z6vDOzS-MI891J_xjDRIK5yJ8rXsaYFuqVqJ-C5fqOfg/exec";
+let cachedSellOutData: SellOutData[] | null = null;
+let lastSellOutFetchTime = 0;
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 menit
 
@@ -807,5 +812,195 @@ export function generateMockIncentiveSEData(): IncentiveSEData[] {
     }
   }
 
+  return data;
+}
+
+export async function fetchSellOutData(forceRefresh = false): Promise<SellOutData[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedSellOutData && (now - lastSellOutFetchTime < CACHE_DURATION)) {
+    console.log("Returning cached Sell Out data");
+    return cachedSellOutData;
+  }
+
+  try {
+    const response = await fetch(`/api/sell-out`);
+    if (!response.ok) throw new Error("Failed to fetch Sell Out records from GAS proxy");
+    const rawData = await response.json();
+    
+    // Check if proxy returned graceful failure
+    if (rawData && rawData.success === false) {
+      console.warn("GAS execution for Sell Out failed or was not configured, using fallback dataset:", rawData.message || rawData.errorType);
+      const mockResult = generateMockSellOutData();
+      const mappedWithFallback = mockResult.map(item => ({
+        ...item,
+        _isFallback: true,
+        _errorType: rawData.errorType || "PROXY_ERROR",
+        _errorMessage: rawData.message || "Google Apps Script error"
+      }));
+      cachedSellOutData = mappedWithFallback;
+      lastSellOutFetchTime = now;
+      return mappedWithFallback;
+    }
+
+    const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
+
+    let arrayData: any[] = [];
+    if (Array.isArray(payloadObj)) {
+      arrayData = payloadObj;
+    } else if (payloadObj && typeof payloadObj === "object") {
+      if (Array.isArray(payloadObj.data)) {
+        arrayData = payloadObj.data;
+      } else if (Array.isArray(payloadObj.rows)) {
+        arrayData = payloadObj.rows;
+      } else if (Array.isArray(payloadObj.records)) {
+        arrayData = payloadObj.records;
+      } else {
+        const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
+        if (possibleArray) {
+          arrayData = possibleArray;
+        } else {
+          console.error("Sell Out script returned an object but no recognizable array of rows was found:", rawData);
+          throw new Error("No array found in Google Apps Script response for Sell Out");
+        }
+      }
+    } else {
+      console.error("Sell Out API did not return readable JSON. Received:", rawData);
+      throw new Error("API response is not a valid JSON array or object for Sell Out");
+    }
+
+    console.log("Fetched Sell Out records:", arrayData.length);
+
+    const mappedData = arrayData.map((item: any) => {
+      const itemNormalized: Record<string, any> = {};
+      for (const k of Object.keys(item)) {
+        const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+        itemNormalized[cleanK] = item[k];
+      }
+
+      const findString = (exactAndAliases: string[], defaultValue = "Unknown"): string => {
+        for (const key of exactAndAliases) {
+          const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+          if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+            return String(itemNormalized[cleanK]).trim() || defaultValue;
+          }
+        }
+        for (const key of exactAndAliases) {
+          const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+          for (const rawK of Object.keys(itemNormalized)) {
+            if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
+              return String(itemNormalized[rawK]).trim() || defaultValue;
+            }
+          }
+        }
+        return defaultValue;
+      };
+
+      const findValue = (exactAndAliases: string[], defaultValue = 0): number => {
+        for (const key of exactAndAliases) {
+          const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+          if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+            const val = itemNormalized[cleanK];
+            if (typeof val === "number") return val;
+            const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+            const num = Number(cleaned);
+            return isNaN(num) ? defaultValue : num;
+          }
+        }
+        for (const key of exactAndAliases) {
+          const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+          for (const rawK of Object.keys(itemNormalized)) {
+            if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
+              const val = itemNormalized[rawK];
+              if (typeof val === "number") return val;
+              const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+              const num = Number(cleaned);
+              return isNaN(num) ? defaultValue : num;
+            }
+          }
+        }
+        return defaultValue;
+      };
+
+      return {
+        calendar_date: findString(["date", "calendar_date", "tanggal"]),
+        channel: findString(["channel", "saluran"]),
+        brand_of: findString(["brand", "brand_of"]),
+        region: findString(["region", "wilayah"]),
+        category: findString(["category", "kategori"]),
+        segment: findString(["segment", "segmen"]),
+        sell_through_value: findValue(["sell_through_value", "sum_of_sell_through_value", "sum of sell_through_value", "sell_through", "sell through", "sum of sell through value"]),
+        sell_out_value: findValue(["sell_out", "sell_out_value", "value", "sell out", "sell out value", "sum_of_sell_out_value", "sum of sell_out_value", "sum of sell out value"]),
+        ba_store_non_ba_store: findString(["ba_store_non_ba_store", "ba_store", "ba store", "ba vs non ba", "ba_non_ba", "ba_store_non_ba_store"]),
+        _isFallback: false
+      };
+    });
+
+    cachedSellOutData = mappedData;
+    lastSellOutFetchTime = now;
+    return mappedData;
+  } catch (error) {
+    console.warn("Fetch Sell Out Error, using fallback:", error);
+    if (cachedSellOutData) return cachedSellOutData;
+    const fallback = generateMockSellOutData();
+    const mappedWithFallback = fallback.map(item => ({
+      ...item,
+      _isFallback: true,
+      _errorType: "FETCH_FAILURE",
+      _errorMessage: error instanceof Error ? error.message : String(error)
+    }));
+    cachedSellOutData = mappedWithFallback;
+    lastSellOutFetchTime = now;
+    return mappedWithFallback;
+  }
+}
+
+export function generateMockSellOutData(): SellOutData[] {
+  const brands = ["SKINTIFIC", "GLAD2GLOW"];
+  const regions = ["East Kalimantan", "South Kalimantan", "West Kalimantan"];
+  const channels = ["GT", "MTI"];
+  const categoriesMap: Record<string, string[]> = {
+    "Makeup": ["Base Makeup", "Makeup Removal"],
+    "Skincare": ["Face", "Sunscreen", "Eyes"],
+    "Others": ["Others"]
+  };
+  
+  const data: SellOutData[] = [];
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 11);
+  
+  for (let m = 0; m < 12; m++) {
+    const currentDate = new Date(startDate);
+    currentDate.setMonth(startDate.getMonth() + m);
+    const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+    const year = currentDate.getFullYear();
+    const dateStr = `${month}/01/${year}`;
+
+    for (let brand of brands) {
+      for (let region of regions) {
+        for (let channel of channels) {
+          for (const [category, segments] of Object.entries(categoriesMap)) {
+            for (let segment of segments) {
+              const sellThrough = Math.floor(Math.random() * 25000000) + 2000000;
+              const sellOut = Math.floor(Math.random() * 20000000) + 1000000;
+              const ba_store_non_ba_store = Math.random() > 0.45 ? "BA Store" : "Non BA Store";
+              data.push({
+                calendar_date: dateStr,
+                channel: channel,
+                brand_of: brand,
+                region: region,
+                category: category,
+                segment: segment,
+                sell_through_value: sellThrough,
+                sell_out_value: sellOut,
+                ba_store_non_ba_store,
+                _isFallback: true
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  
   return data;
 }

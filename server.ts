@@ -11,7 +11,7 @@ app.use(express.json());
 app.get("/api/sales-data", async (req, res) => {
   try {
     const sheet = req.query.sheet ? String(req.query.sheet) : "Sell In and Through";
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyA83M4VP5R3A0vKEUjwh--HOcOjDwnH7b9CVZVsGd4P_RHGqhLhoJvJNsQm9VVkKIIHA/exec";
+    const SCRIPT_URL = process.env.SALES_DATA_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbyA83M4VP5R3A0vKEUjwh--HOcOjDwnH7b9CVZVsGd4P_RHGqhLhoJvJNsQm9VVkKIIHA/exec";
     const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheet)}`;
     console.log(`[Proxy] Fetching sales data from GAS: ${targetUrl}`);
     
@@ -30,7 +30,7 @@ app.get("/api/sales-data", async (req, res) => {
 // API route to proxy SPV Internal Incentive Records
 app.get("/api/incentives-internal", async (req, res) => {
   try {
-    const INCENTIVES_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec";
+    const INCENTIVES_SCRIPT_URL = process.env.INCENTIVES_INTERNAL_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbzH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec";
     console.log("[Proxy] Fetching internal incentives from GAS");
     
     const response = await fetch(INCENTIVES_SCRIPT_URL);
@@ -48,7 +48,7 @@ app.get("/api/incentives-internal", async (req, res) => {
 // API route to proxy SPV Exclusive Incentive Records
 app.get("/api/incentives-exclusive", async (req, res) => {
   try {
-    const EXCLUSIVE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx8W37XlWx_71xdS_-f8JML7HHoDx7iaGxcSxdkYVeSv73o1sQ46AF8lr2i0M6wtE23jw/exec";
+    const EXCLUSIVE_SCRIPT_URL = process.env.INCENTIVES_EXCLUSIVE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbx8W37XlWx_71xdS_-f8JML7HHoDx7iaGxcSxdkYVeSv73o1sQ46AF8lr2i0M6wtE23jw/exec";
     console.log("[Proxy] Fetching exclusive incentives from GAS");
     
     const response = await fetch(EXCLUSIVE_SCRIPT_URL);
@@ -86,7 +86,7 @@ app.get("/api/incentives-exclusive", async (req, res) => {
 // API route to proxy SE Incentive Records
 app.get("/api/incentives-se", async (req, res) => {
   try {
-    const SE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
+    const SE_SCRIPT_URL = process.env.INCENTIVES_SE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
     console.log("[Proxy] Fetching SE incentives from GAS");
 
     const response = await fetch(SE_SCRIPT_URL);
@@ -116,6 +116,52 @@ app.get("/api/incentives-se", async (req, res) => {
       success: false,
       errorType: "FETCH_FAILURE",
       message: err.message || "Failed to fetch SE incentives data from script",
+      data: []
+    });
+  }
+});
+
+// API route to proxy Sell Out sales records
+app.get("/api/sell-out", async (req, res) => {
+  try {
+    let SELL_OUT_SCRIPT_URL = process.env.SELL_OUT_SCRIPT_URL;
+    if (!SELL_OUT_SCRIPT_URL || SELL_OUT_SCRIPT_URL.includes("Placeholder") || !SELL_OUT_SCRIPT_URL.startsWith("https://")) {
+      SELL_OUT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyDS6ZPtUffLDNVieh-hCG4e2z6vDOzS-MI891J_xjDRIK5yJ8rXsaYFuqVqJ-C5fqOfg/exec";
+    }
+    console.log(`[Proxy] Fetching Sell Out data from GAS: ${SELL_OUT_SCRIPT_URL}`);
+
+    const response = await fetch(SELL_OUT_SCRIPT_URL);
+    
+    // Check for 403 Forbidden
+    if (response.status === 403) {
+      console.warn("[Proxy Warning] Sell Out Google Apps Script returned status 403 (Forbidden).");
+      return res.json({
+        success: false,
+        errorType: "403_FORBIDDEN",
+        message: "Google Apps Script returned status 403. Please deploy with 'Who has access: Anyone' and 'Execute as: Me'.",
+        data: []
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Google Apps Script responder returned status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log(`[Proxy] Successfully retrieved ${Array.isArray(data) ? data.length : typeof data} records for Sell Out.`);
+    if (Array.isArray(data) && data.length > 0) {
+      console.log("[Proxy] Sell Out First row keys:", Object.keys(data[0]));
+      console.log("[Proxy] Sell Out First row sample:", JSON.stringify(data[0]));
+    }
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (err: any) {
+    console.warn("[Proxy Warning] Graceful Sell Out fallback due to fetch failure:", err.stack || err.message || err);
+    res.json({
+      success: false,
+      errorType: "FETCH_FAILURE",
+      message: err.message || "Failed to fetch Sell Out data from script",
       data: []
     });
   }

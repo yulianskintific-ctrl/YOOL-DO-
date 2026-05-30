@@ -12,6 +12,22 @@ export interface SalesData {
   supervisor: string;
   sell_in_value: number;
   sell_through_value: number;
+  sell_out_value?: number;
+}
+
+export interface SellOutData {
+  calendar_date: string;
+  channel: string;
+  brand_of: string;
+  region: string;
+  category: string;
+  segment: string;
+  sell_through_value: number;
+  sell_out_value: number;
+  ba_store_non_ba_store?: string;
+  _isFallback?: boolean;
+  _errorType?: string;
+  _errorMessage?: string;
 }
 
 export interface IncentiveSPVData {
@@ -105,7 +121,7 @@ export interface DashboardMetrics {
   topASM: string;
 }
 
-export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'PO Checker' | 'Program Tracker';
+export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'PO Checker' | 'Program Tracker';
 
 export interface FilterState {
   startDate: string;
@@ -117,4 +133,8 @@ export interface FilterState {
   distributors: string[];
   distributorCompanies: string[];
   distributorBranches: string[];
+  channels?: string[];
+  categories?: string[];
+  segments?: string[];
+  baStoreNonBaStores?: string[];
 }
