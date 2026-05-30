@@ -45,13 +45,13 @@ import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData
  */
 
 // GANTI DENGAN URL DEPLOYMENT GOOGLE APPS SCRIPT ANDA
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyA83M4VP5R3A0vKEUjwh--HOcOjDwnH7b9CVZVsGd4P_RHGqhLhoJvJNsQm9VVkKIIHA/exec"; 
+const SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbyA83M4VP5R3A0vKEUjwh--HOcOjDwnH7b9CVZVsGd4P_RHGqhLhoJvJNsQm9VVkKIIHA/exec"; 
 
 // URL DEPLOYMENT GOOGLE APPS SCRIPT BARU UNTUK INCENTIVES SPV INTERNAL UNTUK GOOGLE SHEET YANG BERBEDA
-export const INCENTIVES_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec"; 
+export const INCENTIVES_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_INCENTIVES_INTERNAL_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbzH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec"; 
 
 // URL DEPLOYMENT GOOGLE APPS SCRIPT BARU UNTUK INCENTIVES SPV EXCLUSIVE (MENGGUNAKAN SCRIPT & GOOGLE SHEET YANG BERBEDA)
-export const EXCLUSIVE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx8W37XlWx_71xdS_-f8JML7HHoDx7iaGxcSxdkYVeSv73o1sQ46AF8lr2i0M6wtE23jw/exec"; 
+export const EXCLUSIVE_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_INCENTIVES_EXCLUSIVE_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbx8W37XlWx_71xdS_-f8JML7HHoDx7iaGxcSxdkYVeSv73o1sQ46AF8lr2i0M6wtE23jw/exec"; 
 
 let cachedData: Record<string, SalesData[]> = {};
 let lastFetchTime: Record<string, number> = {};
@@ -61,12 +61,12 @@ let cachedExclusiveData: IncentiveSPVExclusiveData[] | null = null;
 let lastExclusiveFetchTime = 0;
 
 // URL DEPLOYMENT GOOGLE APPS SCRIPT BARU UNTUK INCENTIVES SE (MENGGUNAKAN SCRIPT & GOOGLE SHEET YANG BERBEDA)
-export const SE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
+export const SE_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_INCENTIVES_SE_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
 let cachedSEData: IncentiveSEData[] | null = null;
 let lastSEFetchTime = 0;
 
 // URL DEPLOYMENT GOOGLE APPS SCRIPT BARU UNTUK SELL OUT (MENGGUNAKAN SCRIPT & GOOGLE SHEET YANG BERBEDA)
-export const SELL_OUT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyDS6ZPtUffLDNVieh-hCG4e2z6vDOzS-MI891J_xjDRIK5yJ8rXsaYFuqVqJ-C5fqOfg/exec";
+export const SELL_OUT_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_SELL_OUT_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbyDS6ZPtUffLDNVieh-hCG4e2z6vDOzS-MI891J_xjDRIK5yJ8rXsaYFuqVqJ-C5fqOfg/exec";
 let cachedSellOutData: SellOutData[] | null = null;
 let lastSellOutFetchTime = 0;
 
@@ -822,136 +822,158 @@ export async function fetchSellOutData(forceRefresh = false): Promise<SellOutDat
     return cachedSellOutData;
   }
 
+  let rawData: any = null;
+
+  // 1. First attempt: fetch via the local Node/Express proxy route /api/sell-out
   try {
     const response = await fetch(`/api/sell-out`);
-    if (!response.ok) throw new Error("Failed to fetch Sell Out records from GAS proxy");
-    const rawData = await response.json();
-    
-    // Check if proxy returned graceful failure
-    if (rawData && rawData.success === false) {
-      console.warn("GAS execution for Sell Out failed or was not configured, using fallback dataset:", rawData.message || rawData.errorType);
-      const mockResult = generateMockSellOutData();
-      const mappedWithFallback = mockResult.map(item => ({
-        ...item,
-        _isFallback: true,
-        _errorType: rawData.errorType || "PROXY_ERROR",
-        _errorMessage: rawData.message || "Google Apps Script error"
-      }));
-      cachedSellOutData = mappedWithFallback;
-      lastSellOutFetchTime = now;
-      return mappedWithFallback;
-    }
-
-    const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
-
-    let arrayData: any[] = [];
-    if (Array.isArray(payloadObj)) {
-      arrayData = payloadObj;
-    } else if (payloadObj && typeof payloadObj === "object") {
-      if (Array.isArray(payloadObj.data)) {
-        arrayData = payloadObj.data;
-      } else if (Array.isArray(payloadObj.rows)) {
-        arrayData = payloadObj.rows;
-      } else if (Array.isArray(payloadObj.records)) {
-        arrayData = payloadObj.records;
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success !== false) {
+        rawData = json;
       } else {
-        const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
-        if (possibleArray) {
-          arrayData = possibleArray;
-        } else {
-          console.error("Sell Out script returned an object but no recognizable array of rows was found:", rawData);
-          throw new Error("No array found in Google Apps Script response for Sell Out");
-        }
+        console.warn("GAS proxy returned success: false or invalid response for Sell Out. Will try direct browser fetch.");
       }
     } else {
-      console.error("Sell Out API did not return readable JSON. Received:", rawData);
-      throw new Error("API response is not a valid JSON array or object for Sell Out");
+      console.warn(`Local proxy returned status ${response.status} for Sell Out. Will try direct browser fetch.`);
     }
+  } catch (proxyError) {
+    console.warn("Proxy fetch nested error for Sell Out:", proxyError);
+  }
 
-    console.log("Fetched Sell Out records:", arrayData.length);
+  // 2. Second attempt: Direct fetch to GAS from the browser (perfect for Vercel/Static CDNs without active Express daemons)
+  if (!rawData && SELL_OUT_SCRIPT_URL) {
+    try {
+      console.log("Attempting direct browser fetch for Sell Out from:", SELL_OUT_SCRIPT_URL);
+      const response = await fetch(SELL_OUT_SCRIPT_URL);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for Sell Out succeeded!");
+      } else {
+        throw new Error(`Direct fetch returned status: ${response.status}`);
+      }
+    } catch (directError) {
+      console.error("Direct browser fetch for Sell Out failed:", directError);
+    }
+  }
 
-    const mappedData = arrayData.map((item: any) => {
-      const itemNormalized: Record<string, any> = {};
-      for (const k of Object.keys(item)) {
-        const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
-        itemNormalized[cleanK] = item[k];
+  // 3. Process and map retrieved raw JSON payload if successful
+  if (rawData) {
+    try {
+      const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
+
+      let arrayData: any[] = [];
+      if (Array.isArray(payloadObj)) {
+        arrayData = payloadObj;
+      } else if (payloadObj && typeof payloadObj === "object") {
+        if (Array.isArray(payloadObj.data)) {
+          arrayData = payloadObj.data;
+        } else if (Array.isArray(payloadObj.rows)) {
+          arrayData = payloadObj.rows;
+        } else if (Array.isArray(payloadObj.records)) {
+          arrayData = payloadObj.records;
+        } else {
+          const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
+          if (possibleArray) {
+            arrayData = possibleArray;
+          } else {
+            console.error("Sell Out script returned an object but no recognizable array of rows was found:", rawData);
+            throw new Error("No array found in Google Apps Script response for Sell Out");
+          }
+        }
+      } else {
+        console.error("Sell Out API did not return readable JSON. Received:", rawData);
+        throw new Error("API response is not a valid JSON array or object for Sell Out");
       }
 
-      const findString = (exactAndAliases: string[], defaultValue = "Unknown"): string => {
-        for (const key of exactAndAliases) {
-          const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
-          if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
-            return String(itemNormalized[cleanK]).trim() || defaultValue;
-          }
+      console.log("Fetched Sell Out records:", arrayData.length);
+
+      const mappedData = arrayData.map((item: any) => {
+        const itemNormalized: Record<string, any> = {};
+        for (const k of Object.keys(item)) {
+          const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+          itemNormalized[cleanK] = item[k];
         }
-        for (const key of exactAndAliases) {
-          const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
-          for (const rawK of Object.keys(itemNormalized)) {
-            if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
-              return String(itemNormalized[rawK]).trim() || defaultValue;
+
+        const findString = (exactAndAliases: string[], defaultValue = "Unknown"): string => {
+          for (const key of exactAndAliases) {
+            const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+              return String(itemNormalized[cleanK]).trim() || defaultValue;
             }
           }
-        }
-        return defaultValue;
-      };
-
-      const findValue = (exactAndAliases: string[], defaultValue = 0): number => {
-        for (const key of exactAndAliases) {
-          const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
-          if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
-            const val = itemNormalized[cleanK];
-            if (typeof val === "number") return val;
-            const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
-            const num = Number(cleaned);
-            return isNaN(num) ? defaultValue : num;
+          for (const key of exactAndAliases) {
+            const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            for (const rawK of Object.keys(itemNormalized)) {
+              if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
+                return String(itemNormalized[rawK]).trim() || defaultValue;
+              }
+            }
           }
-        }
-        for (const key of exactAndAliases) {
-          const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
-          for (const rawK of Object.keys(itemNormalized)) {
-            if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
-              const val = itemNormalized[rawK];
+          return defaultValue;
+        };
+
+        const findValue = (exactAndAliases: string[], defaultValue = 0): number => {
+          for (const key of exactAndAliases) {
+            const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+              const val = itemNormalized[cleanK];
               if (typeof val === "number") return val;
               const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
               const num = Number(cleaned);
               return isNaN(num) ? defaultValue : num;
             }
           }
-        }
-        return defaultValue;
-      };
+          for (const key of exactAndAliases) {
+            const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            for (const rawK of Object.keys(itemNormalized)) {
+              if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
+                const val = itemNormalized[rawK];
+                if (typeof val === "number") return val;
+                const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+                const num = Number(cleaned);
+                return isNaN(num) ? defaultValue : num;
+              }
+            }
+          }
+          return defaultValue;
+        };
 
-      return {
-        calendar_date: findString(["date", "calendar_date", "tanggal"]),
-        channel: findString(["channel", "saluran"]),
-        brand_of: findString(["brand", "brand_of"]),
-        region: findString(["region", "wilayah"]),
-        category: findString(["category", "kategori"]),
-        segment: findString(["segment", "segmen"]),
-        sell_through_value: findValue(["sell_through_value", "sum_of_sell_through_value", "sum of sell_through_value", "sell_through", "sell through", "sum of sell through value"]),
-        sell_out_value: findValue(["sell_out", "sell_out_value", "value", "sell out", "sell out value", "sum_of_sell_out_value", "sum of sell_out_value", "sum of sell out value"]),
-        ba_store_non_ba_store: findString(["ba_store_non_ba_store", "ba_store", "ba store", "ba vs non ba", "ba_non_ba", "ba_store_non_ba_store"]),
-        _isFallback: false
-      };
-    });
+        return {
+          calendar_date: findString(["date", "calendar_date", "tanggal"]),
+          channel: findString(["channel", "saluran"]),
+          brand_of: findString(["brand", "brand_of"]),
+          region: findString(["region", "wilayah"]),
+          category: findString(["category", "kategori"]),
+          segment: findString(["segment", "segmen"]),
+          sell_through_value: findValue(["sell_through_value", "sum_of_sell_through_value", "sum of sell_through_value", "sell_through", "sell through", "sum of sell through value"]),
+          sell_out_value: findValue(["sell_out", "sell_out_value", "value", "sell out", "sell out value", "sum_of_sell_out_value", "sum of sell_out_value", "sum of sell out value"]),
+          ba_store_non_ba_store: findString(["ba_store_non_ba_store", "ba_store", "ba store", "ba vs non ba", "ba_non_ba", "ba_store_non_ba_store"]),
+          _isFallback: false
+        };
+      });
 
-    cachedSellOutData = mappedData;
-    lastSellOutFetchTime = now;
-    return mappedData;
-  } catch (error) {
-    console.warn("Fetch Sell Out Error, using fallback:", error);
-    if (cachedSellOutData) return cachedSellOutData;
-    const fallback = generateMockSellOutData();
-    const mappedWithFallback = fallback.map(item => ({
-      ...item,
-      _isFallback: true,
-      _errorType: "FETCH_FAILURE",
-      _errorMessage: error instanceof Error ? error.message : String(error)
-    }));
-    cachedSellOutData = mappedWithFallback;
-    lastSellOutFetchTime = now;
-    return mappedWithFallback;
+      cachedSellOutData = mappedData;
+      lastSellOutFetchTime = now;
+      return mappedData;
+    } catch (mappingError) {
+      console.error("Error parsing or mapping Sell Out keys:", mappingError);
+    }
   }
+
+  // 4. Last fallback if both connection steps failed
+  if (cachedSellOutData) return cachedSellOutData;
+  console.warn("Both local API proxy and direct browser fetch failed for Sell Out; using mapped mockup data.");
+  const fallback = generateMockSellOutData();
+  const mappedWithFallback = fallback.map(item => ({
+    ...item,
+    _isFallback: true,
+    _errorType: "FETCH_FAILURE",
+    _errorMessage: "Failed to connect to both Google Apps Script API proxy and direct browser endpoints."
+  }));
+  cachedSellOutData = mappedWithFallback;
+  lastSellOutFetchTime = now;
+  return mappedWithFallback;
 }
 
 export function generateMockSellOutData(): SellOutData[] {
