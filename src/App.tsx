@@ -19,6 +19,7 @@ import IncentivesSPVTable from "./components/IncentivesSPVTable";
 import IncentivesSPVExclusiveTable from "./components/IncentivesSPVExclusiveTable";
 import IncentivesSETable from "./components/IncentivesSETable";
 import SellOutDashboard from "./components/SellOutDashboard";
+import { SKUList } from "./components/SKUList";
 
 export default function App() {
   const [data, setData] = useState<SalesData[]>([]);
@@ -508,7 +509,11 @@ export default function App() {
       />
       
       <main className={cn("transition-all duration-500 p-8 max-w-[1500px] mx-auto", isSidebarCollapsed ? "pl-28" : "pl-72")}>
-        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-50">
+        {activeMenu === 'Product Catalog' ? (
+          <SKUList />
+        ) : (
+          <>
+            <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-50">
           <div>
             <h2 className="text-4xl font-black tracking-tight text-slate-900 mb-1">{activeMenu} Dashboard</h2>
             <p className="text-slate-400 text-sm font-medium">Strategic performance insights by YOOL-DO!</p>
@@ -655,11 +660,15 @@ export default function App() {
         ) : activeMenu === 'Sell Out' ? null : (
           <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <Loader2 className="w-8 h-8 text-blue-600" />
+              <Loader2 className="w-8 h-8 text-blue-600 animate-pulse" />
             </div>
             <h3 className="text-lg font-black text-slate-900 mb-2">{activeMenu} Menu</h3>
-            <p className="text-slate-500 text-sm max-w-sm text-center">Module is currently being configured to synchronize specific incentive targets and payout structures.</p>
+            <p className="text-slate-500 text-sm max-w-sm text-center">
+              Module is currently being configured to synchronize specific targets and performance structures.
+            </p>
           </div>
+        )}
+          </>
         )}
 
         <footer className="mt-16 -mx-8 px-8 py-8 bg-blue-600 text-white/90">

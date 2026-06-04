@@ -8,7 +8,7 @@ import { SIDEBAR_ITEMS } from "../constants";
 import { SidebarMenu } from "../types";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft, ChevronRight, ChevronDown, Coins } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Coins, Package } from "lucide-react";
 
 interface SidebarProps {
   activeMenu: SidebarMenu;
@@ -39,6 +39,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
     const seIncentives = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SE');
     const poChecker = SIDEBAR_ITEMS.find(i => i.name === 'PO Checker');
     const programTracker = SIDEBAR_ITEMS.find(i => i.name === 'Program Tracker');
+    const skuList = SIDEBAR_ITEMS.find(i => i.name === 'Product Catalog');
 
     return [
       sellIn && { type: 'item' as const, item: sellIn },
@@ -54,6 +55,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
           seIncentives
         ].filter(Boolean) as typeof SIDEBAR_ITEMS
       },
+      skuList && { type: 'item' as const, item: skuList },
       poChecker && { type: 'item' as const, item: poChecker },
       programTracker && { type: 'item' as const, item: programTracker }
     ].filter(Boolean);
@@ -141,6 +143,12 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
               </button>
             );
           } else {
+            const isGroupActive = isAnySubItemActive;
+            const isGroupExpanded = isIncentivesExpanded;
+            const toggleGroup = () => setIsIncentivesExpanded(!isIncentivesExpanded);
+            const forceOpen = () => setIsIncentivesExpanded(true);
+            const GroupIcon = elem.icon;
+
             return (
               <div key={elem.name} className="space-y-1">
                 {/* Group Selector Button */}
@@ -149,21 +157,21 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
                   onClick={() => {
                     if (isCollapsed) {
                       onToggleCollapse();
-                      setIsIncentivesExpanded(true);
+                      forceOpen();
                     } else {
-                      setIsIncentivesExpanded(!isIncentivesExpanded);
+                      toggleGroup();
                     }
                   }}
                   className={cn(
                     "w-full flex items-center rounded-2xl text-sm font-bold transition-all duration-350 group relative cursor-pointer",
                     isCollapsed ? "justify-center h-12 p-0" : "gap-3 px-4 py-3.5",
-                    isAnySubItemActive && !isIncentivesExpanded
+                    isGroupActive && !isGroupExpanded
                       ? "bg-blue-50/60 text-blue-600 font-extrabold" 
                       : "text-slate-400 hover:bg-slate-50 hover:text-blue-600"
                   )}
                   title={isCollapsed ? elem.name : ""}
                 >
-                  <Coins size={18} className={cn("shrink-0 transition-colors", isAnySubItemActive ? "text-blue-600" : "group-hover:text-blue-500")} />
+                  <GroupIcon size={18} className={cn("shrink-0 transition-colors", isGroupActive ? "text-blue-600" : "group-hover:text-blue-500")} />
                   
                   {!isCollapsed && (
                     <motion.span 
@@ -180,15 +188,16 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
                       size={14} 
                       className={cn(
                         "text-slate-400 group-hover:text-blue-500 transition-transform duration-200 shrink-0", 
-                        isIncentivesExpanded ? "rotate-180" : ""
+                        isGroupExpanded ? "rotate-180" : ""
                       )} 
+                      
                     />
                   )}
                 </button>
 
                 {/* Subitems container */}
                 <AnimatePresence initial={false}>
-                  {isIncentivesExpanded && (
+                  {isGroupExpanded && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
@@ -217,7 +226,11 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
                           >
                             {isCollapsed ? (
                               <span className="text-[9px] font-black text-center tracking-tighter uppercase whitespace-nowrap">
-                                {subItem.name.includes("Internal") ? "INT" : subItem.name.includes("Exclusive") ? "EXC" : "SE"}
+                                {subItem.name.includes("Internal") 
+                                  ? "INT" 
+                                  : subItem.name.includes("Exclusive") 
+                                    ? "EXC" 
+                                    : "SE"}
                               </span>
                             ) : (
                               <span className="truncate text-left">{subItem.name}</span>

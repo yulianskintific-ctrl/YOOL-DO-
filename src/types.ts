@@ -121,7 +121,7 @@ export interface DashboardMetrics {
   topASM: string;
 }
 
-export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'PO Checker' | 'Program Tracker';
+export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'PO Checker' | 'Program Tracker' | 'Product Catalog';
 
 export interface FilterState {
   startDate: string;

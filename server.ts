@@ -167,6 +167,108 @@ app.get("/api/sell-out", async (req, res) => {
   }
 });
 
+// API route to proxy Product Catalog Google Sheets / Apps Script data
+app.get("/api/product-catalog", async (req, res) => {
+  try {
+    const defaultUrl = "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec";
+    const syncUrl = req.query.url ? String(req.query.url) : defaultUrl;
+    const method = req.query.method ? String(req.query.method) : "gas";
+
+    console.log(`[Proxy] Fetching product catalog via backend. Method: ${method}, URL: ${syncUrl}`);
+
+    let targetUrl = syncUrl;
+    if (method === "csv" && syncUrl.includes("docs.google.com/spreadsheets")) {
+      const match = syncUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (match && match[1]) {
+        targetUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+      }
+    }
+
+    // Set standard browser headers to prevent Google's macro servers from throwing 403 Forbidden errors
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    });
+    
+    // Check for 403 Forbidden
+    if (response.status === 403) {
+      console.warn("[Proxy Warning] Product Catalog source returned status 403 (Forbidden) in backend.");
+      return res.status(200).json({
+        success: false,
+        error: "Akses Ditolak (Status 403). Pastikan Google Sheet Anda diatur publik atau Web App dideploy dengan hak akses 'Anyone'."
+      });
+    }
+
+    if (!response.ok) {
+      return res.status(200).json({
+        success: false,
+        error: `Mengakses Google API gagal dengan status HTTP ${response.status}. Hubungi developer untuk memeriksa link.`
+      });
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    
+    if (method === "csv") {
+      const text = await response.text();
+      // Check if it is actually HTML
+      if (text.trim().startsWith("<") || text.includes("<html") || text.includes("<!DOCTYPE html>")) {
+        return res.status(200).json({
+          success: false,
+          error: "Google Sheets mengembalikan halaman HTML, bukan data CSV. Mohon pastikan link 'Publish to Web' sudah benar dan aktif."
+        });
+      }
+      res.json({ success: true, format: "csv", data: text });
+    } else {
+      const text = await response.text();
+      
+      // Check for specific Google Apps Script runtime errors/exceptions
+      if (text.includes("TypeError:") || text.includes("is not a function") || text.includes("ReferenceError:") || (text.includes("Google Apps Script") && text.includes("Error") && text.includes("monospace"))) {
+        let errorMessage = "Terjadi kesalahan (Runtime Error) pada Google Apps Script Anda.";
+        // Locate matching monospace error container from Google Apps Script HTML template
+        const errorMatch = text.match(/max-width:600px">([\s\S]*?)<\/div>/) || text.match(/class="errorMessage">([\s\S]*?)<\/div>/);
+        if (errorMatch && errorMatch[1]) {
+          errorMessage = `Error Google Apps Script: "${errorMatch[1].replace(/&quot;/g, '"').trim()}"`;
+        }
+        
+        // Specifically reference the setHeader issue if detected
+        if (text.includes("setHeader is not a function")) {
+          errorMessage = 'Script Error: "ContentService...setHeader is not a function". Di Google Apps Script, objek Content tidak memiliki fungsi .setHeader(). Silakan hapus ".setHeader(\'Access-Control-Allow-Origin\', \'*\')" dari baris terakhir doGet().';
+        }
+        
+        return res.status(200).json({
+          success: false,
+          error: `${errorMessage} Harap buka Extensions > Apps Script, perbaiki kodenya, dan deploy ulang (New Deployment).`
+        });
+      }
+
+      // Check if response is HTML or contains Google redirection error
+      if (text.trim().startsWith("<") || text.includes("<html") || text.includes("<!DOCTYPE html>") || text.includes("Google Accounts")) {
+        return res.status(200).json({
+          success: false,
+          error: "Web App Apps Script mengembalikan halaman HTML/Otorisasi (Redirect login). Ini terjadi karena 'Who has access' belum disetting ke 'Anyone' atau Deployment Anda membutuhkan izin (Authorize)."
+        });
+      }
+
+      try {
+        const data = JSON.parse(text);
+        res.json({ success: true, format: "gas", data: data });
+      } catch (parseError: any) {
+        console.error("[Proxy parseError] Raw body:", text.substring(0, 300));
+        return res.status(200).json({
+          success: false,
+          error: `Gagal membaca format JSON dari Apps Script. Pesan: ${parseError.message || ""}. Pastikan spreadsheet Anda mengembalikan JSON yang valid.`
+        });
+      }
+    }
+  } catch (err: any) {
+    console.error("[Proxy Error] Product catalog fetch failure:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to fetch product catalog data" });
+  }
+});
+
 async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
