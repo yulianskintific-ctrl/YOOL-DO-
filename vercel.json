@@ -22,6 +22,10 @@
       "destination": "https://script.google.com/macros/s/AKfycbyDS6ZPtUffLDNVieh-hCG4e2z6vDOzS-MI891J_xjDRIK5yJ8rXsaYFuqVqJ-C5fqOfg/exec"
     },
     {
+      "source": "/api/product-catalog",
+      "destination": "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
