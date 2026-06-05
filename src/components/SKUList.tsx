@@ -88,7 +88,7 @@ function mapFuzzyItem(item: any): SKUData {
       descriptionProduct = val ? String(val).trim() : "";
     } else if (key.includes("brand") || key.includes("merk")) {
       brand = val ? String(val).trim() : "SKINTIFIC";
-    } else if (key.includes("assortment") || key.includes("paket")) {
+    } else if (key.includes("assort") || key.includes("paket")) {
       assortment = val ? String(val).trim() : "Other SKU";
     } else if (key.includes("category") || key.includes("kategori")) {
       category = val ? String(val).trim() : "Skincare";
@@ -320,19 +320,55 @@ export function SKUList() {
     try {
       const defaultUrl = "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec";
       const proxyUrl = `/api/product-catalog?url=${encodeURIComponent(defaultUrl)}&method=gas`;
-      const response = await fetch(proxyUrl);
+      let response = await fetch(proxyUrl);
+      
+      // If we got a status error, or if it has Vercel connection/CORS issues, fallback to direct fetch
+      if (!response.ok) {
+        console.warn(`[Proxy Warning] Direct proxy returned status ${response.status}. Trying direct browser fetch.`);
+        response = await fetch(defaultUrl);
+      }
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Koneksi backend gagal (Status ${response.status}).`);
+        throw new Error(`Koneksi ke Google Sheets gagal (Status ${response.status}).`);
       }
 
       const result = await response.json();
-      if (!result.success) {
+      let json: any = null;
+
+      if (Array.isArray(result)) {
+        json = result;
+      } else if (result && result.success && Array.isArray(result.data)) {
+        json = result.data;
+      } else if (result && result.success === false) {
         throw new Error(result.error || "Gagal memproses data dari backend proxy.");
+      } else if (result && typeof result === "object") {
+        const possibleKeys = ["data", "products", "items", "records", "rows"];
+        for (const key of possibleKeys) {
+          if (Array.isArray(result[key])) {
+            json = result[key];
+            break;
+          }
+        }
       }
 
-      const json = result.data;
+      if (!json) {
+        // Last-resort fallback: try direct URL
+        console.log("[Proxy Fallback] Trying direct fetch as last resort...");
+        const fallbackRes = await fetch(defaultUrl);
+        if (fallbackRes.ok) {
+          const fbJson = await fallbackRes.json();
+          if (Array.isArray(fbJson)) {
+            json = fbJson;
+          } else if (fbJson && fbJson.data && Array.isArray(fbJson.data)) {
+            json = fbJson.data;
+          }
+        }
+      }
+
+      if (!json) {
+        throw new Error("Format respon tidak dikenal. Pastikan Google Apps Script mengembalikan array JSON.");
+      }
+
       const fetchedData = parseJSONDataToSKUList(json);
 
       if (fetchedData.length === 0) {
@@ -464,14 +500,35 @@ export function SKUList() {
 
       try {
         const proxyUrl = `/api/product-catalog?url=${encodeURIComponent(targetUrl)}&method=gas`;
-        const res = await fetch(proxyUrl);
+        let res = await fetch(proxyUrl);
+        
+        // Dynamic fallback in case proxy is unreachable or Vercel static router returns non-200
+        if (!res.ok) {
+          console.warn(`[AutoSync Proxy Warning] HTTP ${res.status}. Falling back to direct Apps Script fetch.`);
+          res = await fetch(targetUrl);
+        }
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         
         const result = await res.json();
         if (!active) return;
 
-        if (result.success) {
-          const json = result.data;
+        let json: any = null;
+        if (Array.isArray(result)) {
+          json = result;
+        } else if (result && result.success && Array.isArray(result.data)) {
+          json = result.data;
+        } else if (result && typeof result === "object") {
+          const possibleKeys = ["data", "products", "items", "records", "rows"];
+          for (const key of possibleKeys) {
+            if (Array.isArray(result[key])) {
+              json = result[key];
+              break;
+            }
+          }
+        }
+
+        if (json) {
           const fetchedData = parseJSONDataToSKUList(json);
 
           if (fetchedData.length > 0) {
@@ -489,7 +546,7 @@ export function SKUList() {
             throw new Error("Data hasil parse kosong.");
           }
         } else {
-          throw new Error(result.error || "Gagal menarik data via proxy.");
+          throw new Error("Format respon tidak dikenal atau tidak bisa dimapping.");
         }
       } catch (err: any) {
         console.warn("[AutoSync Mount Warning] Could not auto-sync:", err);
