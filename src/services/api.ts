@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData } from "../types";
+import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData, SKUFocusStoreData, SKUFocusSPVData } from "../types";
 
 /**
  * SALIN & TEMPEL KODE INI KE GOOGLE APPS SCRIPT:
@@ -69,6 +69,13 @@ let lastSEFetchTime = 0;
 export const SELL_OUT_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_SELL_OUT_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbyDS6ZPtUffLDNVieh-hCG4e2z6vDOzS-MI891J_xjDRIK5yJ8rXsaYFuqVqJ-C5fqOfg/exec";
 let cachedSellOutData: SellOutData[] | null = null;
 let lastSellOutFetchTime = 0;
+
+// URL DEPLOYMENT GOOGLE APPS SCRIPT BARU UNTUK SKU FOCUS (MENGGUNAKAN SCRIPT & GOOGLE SHEET YANG BERBEDA)
+export const SKU_FOCUS_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_SKU_FOCUS_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbxwAD5bkdKM_bJ4v25FQT9neXHRXMnXqzlIUaKje1xCqPqB9wbrn40EbcxSDtEXaMgUuw/exec";
+let cachedSKUStoreData: SKUFocusStoreData[] | null = null;
+let lastSKUStoreFetchTime = 0;
+let cachedSKUSPVData: SKUFocusSPVData[] | null = null;
+let lastSKUSPVFetchTime = 0;
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 menit
 
@@ -156,10 +163,40 @@ export async function fetchIncentiveSPVData(forceRefresh = false): Promise<Incen
     return cachedIncentivesData;
   }
 
+  let rawData: any = null;
+
+  // 1. Attempt local proxy
   try {
     const response = await fetch(`/api/incentives-internal`);
-    if (!response.ok) throw new Error("Failed to fetch incentive records from GAS");
-    const rawData = await response.json();
+    if (response.ok) {
+      rawData = await response.json();
+    } else {
+      console.warn(`Local proxy returned status ${response.status} for SPV Internal Incentives. Trying direct browser fetch.`);
+    }
+  } catch (proxyError) {
+    console.warn("Proxy fetch nested error for SPV Internal Incentives:", proxyError);
+  }
+
+  // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
+  if (!rawData && INCENTIVES_SCRIPT_URL) {
+    try {
+      console.log("Attempting direct browser fetch for SPV Internal Incentives from:", INCENTIVES_SCRIPT_URL);
+      const response = await fetch(INCENTIVES_SCRIPT_URL);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for SPV Internal Incentives succeeded!");
+      } else {
+        throw new Error(`Direct fetch returned status: ${response.status}`);
+      }
+    } catch (directError) {
+      console.error("Direct browser fetch for SPV Internal Incentives failed:", directError);
+    }
+  }
+
+  try {
+    if (!rawData) {
+      throw new Error("Gagal mengambil data SPV Internal dari proxy dan direct fetch");
+    }
     
     if (!Array.isArray(rawData)) {
       console.error("Incentives API did not return an array. Received:", rawData);
@@ -324,20 +361,50 @@ export async function fetchIncentiveSPVExclusiveData(forceRefresh = false): Prom
     return cachedExclusiveData;
   }
 
+  let rawData: any = null;
+
+  // 1. Attempt local proxy
   try {
     const response = await fetch(`/api/incentives-exclusive`);
-    if (!response.ok) throw new Error("Failed to fetch exclusive incentive records from GAS");
-    const rawData = await response.json();
-    
-    // Check if proxy returned graceful failure (e.g. 403 Forbidden or fetch failure)
-    if (rawData && rawData.success === false) {
-      console.warn("GAS execution failed or was forbidden, using fallback dataset:", rawData.message || rawData.errorType);
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success !== false) {
+        rawData = json;
+      } else {
+        console.warn("GAS proxy returned success: false or invalid response for exclusive:", json?.message);
+      }
+    } else {
+      console.warn(`Local proxy returned status ${response.status} for exclusive incentives. Trying direct browser fetch.`);
+    }
+  } catch (proxyError) {
+    console.warn("Proxy fetch nested error for exclusive incentives:", proxyError);
+  }
+
+  // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
+  if (!rawData && EXCLUSIVE_SCRIPT_URL) {
+    try {
+      console.log("Attempting direct browser fetch for exclusive incentives from:", EXCLUSIVE_SCRIPT_URL);
+      const response = await fetch(EXCLUSIVE_SCRIPT_URL);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for exclusive incentives succeeded!");
+      } else {
+        throw new Error(`Direct fetch returned status: ${response.status}`);
+      }
+    } catch (directError) {
+      console.error("Direct browser fetch for exclusive incentives failed:", directError);
+    }
+  }
+
+  try {
+    if (!rawData) {
+      console.warn("Both proxy and direct fetch for exclusive incentives failed. Using local mockup fallback.");
       const mockResult = generateMockIncentiveSPVExclusiveData();
       const mappedWithFallback = mockResult.map(item => ({
         ...item,
         _isFallback: true,
-        _errorType: rawData.errorType || "PROXY_ERROR",
-        _errorMessage: rawData.message || "Google Apps Script error"
+        _errorType: "FETCH_FAILURE",
+        _errorMessage: "Gagal memuat data SPV Eksklusif dari server dan direct API."
       }));
       cachedExclusiveData = mappedWithFallback;
       lastExclusiveFetchTime = now;
@@ -574,20 +641,50 @@ export async function fetchIncentiveSEData(forceRefresh = false): Promise<Incent
     return cachedSEData;
   }
 
+  let rawData: any = null;
+
+  // 1. Attempt local proxy
   try {
     const response = await fetch(`/api/incentives-se`);
-    if (!response.ok) throw new Error("Failed to fetch SE incentive records from GAS proxy");
-    const rawData = await response.json();
-    
-    // Check if proxy returned graceful failure (e.g. not configured, 403 Forbidden or fetch failure)
-    if (rawData && rawData.success === false) {
-      console.warn("GAS execution for SE failed or was not configured, using fallback dataset:", rawData.message || rawData.errorType);
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success !== false) {
+        rawData = json;
+      } else {
+        console.warn("GAS proxy returned success: false or invalid response for SE:", json?.message);
+      }
+    } else {
+      console.warn(`Local proxy returned status ${response.status} for SE Incentives. Trying direct browser fetch.`);
+    }
+  } catch (proxyError) {
+    console.warn("Proxy fetch nested error for SE Incentives:", proxyError);
+  }
+
+  // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
+  if (!rawData && SE_SCRIPT_URL) {
+    try {
+      console.log("Attempting direct browser fetch for SE Incentives from:", SE_SCRIPT_URL);
+      const response = await fetch(SE_SCRIPT_URL);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for SE Incentives succeeded!");
+      } else {
+        throw new Error(`Direct fetch returned status: ${response.status}`);
+      }
+    } catch (directError) {
+      console.error("Direct browser fetch for SE Incentives failed:", directError);
+    }
+  }
+
+  try {
+    if (!rawData) {
+      console.warn("Both proxy and direct fetch for SE Incentives failed. Using local mockup fallback.");
       const mockResult = generateMockIncentiveSEData();
       const mappedWithFallback = mockResult.map(item => ({
         ...item,
         _isFallback: true,
-        _errorType: rawData.errorType || "PROXY_ERROR",
-        _errorMessage: rawData.message || "Google Apps Script error for SE"
+        _errorType: "FETCH_FAILURE",
+        _errorMessage: "Gagal memuat data SE dari server dan direct API."
       }));
       cachedSEData = mappedWithFallback;
       lastSEFetchTime = now;
@@ -1024,5 +1121,382 @@ export function generateMockSellOutData(): SellOutData[] {
     }
   }
   
+  return data;
+}
+
+export async function fetchSKUFocusStoreData(forceRefresh = false): Promise<SKUFocusStoreData[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedSKUStoreData && (now - lastSKUStoreFetchTime < CACHE_DURATION)) {
+    console.log("Returning cached SKU Focus Store data");
+    return cachedSKUStoreData;
+  }
+
+  let rawData: any = null;
+
+  // 1. Attempt local proxy
+  try {
+    const response = await fetch(`/api/sku-focus?sheet=Store%20Ach`);
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success === false && json.errorType === "LIBRARY_URL_DETECTED") {
+        throw new Error(`LIBRARY_URL_DETECTED: ${json.message}`);
+      }
+      if (json && json.success !== false) {
+        rawData = json;
+      } else {
+        console.warn("GAS proxy returned success: false or invalid response for SKU Focus Store.");
+      }
+    } else {
+      console.warn(`Local proxy returned status ${response.status} for SKU Focus Store. Trying direct fetch.`);
+    }
+  } catch (proxyError: any) {
+    if (proxyError.message && proxyError.message.startsWith("LIBRARY_URL_DETECTED:")) {
+      throw proxyError;
+    }
+    console.warn("Proxy fetch nested error for SKU Focus Store:", proxyError);
+  }
+
+  // 2. Fallback to direct client-side fetch from browser
+  if (!rawData && SKU_FOCUS_SCRIPT_URL) {
+    try {
+      const targetUrl = `${SKU_FOCUS_SCRIPT_URL}?sheet=${encodeURIComponent("Store Ach")}`;
+      console.log("Attempting direct browser fetch for SKU Focus Store from:", targetUrl);
+      const response = await fetch(targetUrl);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for SKU Focus Store succeeded!");
+      } else {
+        throw new Error(`Direct fetch returned status: ${response.status}`);
+      }
+    } catch (directError) {
+      console.error("Direct browser fetch for SKU Focus Store failed:", directError);
+    }
+  }
+
+  // 3. Process and map retrieved raw JSON payload if successful
+  if (rawData) {
+    try {
+      const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
+
+      let arrayData: any[] = [];
+      if (Array.isArray(payloadObj)) {
+        arrayData = payloadObj;
+      } else if (payloadObj && typeof payloadObj === "object") {
+        if (Array.isArray(payloadObj.data)) {
+          arrayData = payloadObj.data;
+        } else if (Array.isArray(payloadObj.rows)) {
+          arrayData = payloadObj.rows;
+        } else if (Array.isArray(payloadObj.records)) {
+          arrayData = payloadObj.records;
+        } else {
+          const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
+          if (possibleArray) {
+            arrayData = possibleArray;
+          }
+        }
+      }
+
+      if (arrayData && arrayData.length > 0) {
+        const mappedData = arrayData.map((item: any) => {
+          const itemNormalized: Record<string, any> = {};
+          for (const k of Object.keys(item)) {
+            const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            itemNormalized[cleanK] = item[k];
+          }
+
+          const findString = (exactAndAliases: string[], defaultValue = "Unknown"): string => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                return String(itemNormalized[cleanK]).trim() || defaultValue;
+              }
+            }
+            return defaultValue;
+          };
+
+          const findValue = (exactAndAliases: string[], defaultValue = 0): number => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                const val = itemNormalized[cleanK];
+                if (typeof val === "number") return val;
+                const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+                const num = Number(cleaned);
+                return isNaN(num) ? defaultValue : num;
+              }
+            }
+            return defaultValue;
+          };
+
+          return {
+            region: findString(["region", "wilayah", "area"]),
+            distributor_name: findString(["distributor_name", "distributor", "nama_distributor"]),
+            cust_id: findString(["cust_id", "cust_no", "customer_id", "id_customer", "id_cust", "custid"]),
+            cust_name: findString(["cust_name", "customer_name", "nama_customer", "nama_toko", "outlet", "outlet_name"]),
+            asm: findString(["asm", "nama_asm", "area_sales_manager"]),
+            spv: findString(["spv", "supervisor", "nama_supervisor", "nama_spv"]),
+            distributor_se: findString(["distributor_se", "se", "sales_executive", "se_distributor"]),
+            sku: findString(["sku", "product", "nama_sku", "product_sku", "item"]),
+            qty: findValue(["qty", "quantity", "jumlah_qty", "qty_st"]),
+            st: findValue(["st", "sell_through", "sell_out", "value", "st_value"]),
+            eligible_st: findValue(["eligible_st", "eligible_st_value", "st_eligible", "eligible_sell_through", "steligible"]),
+            eligibility: findString(["eligibility", "status", "eligible", "keterangan"])
+          };
+        });
+
+        cachedSKUStoreData = mappedData;
+        lastSKUStoreFetchTime = now;
+        return mappedData;
+      }
+    } catch (mappingError) {
+      console.error("Error parsing or mapping SKU Focus Store keys:", mappingError);
+    }
+  }
+
+  // 4. Last fallback if both connection steps failed
+  if (cachedSKUStoreData) return cachedSKUStoreData;
+  console.warn("Both local API proxy and direct browser fetch failed for SKU Focus Store; using mapped mockup data.");
+  const fallback = generateMockSKUFocusStoreData();
+  const mappedWithFallback = fallback.map(item => ({
+    ...item,
+    _isFallback: true
+  }));
+  cachedSKUStoreData = mappedWithFallback;
+  lastSKUStoreFetchTime = now;
+  return mappedWithFallback;
+}
+
+export async function fetchSKUFocusSPVData(forceRefresh = false): Promise<SKUFocusSPVData[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedSKUSPVData && (now - lastSKUSPVFetchTime < CACHE_DURATION)) {
+    console.log("Returning cached SKU Focus SPV data");
+    return cachedSKUSPVData;
+  }
+
+  let rawData: any = null;
+
+  // 1. Attempt local proxy
+  try {
+    const response = await fetch(`/api/sku-focus?sheet=SPV%20Ach`);
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success === false && json.errorType === "LIBRARY_URL_DETECTED") {
+        throw new Error(`LIBRARY_URL_DETECTED: ${json.message}`);
+      }
+      if (json && json.success !== false) {
+        rawData = json;
+      } else {
+        console.warn("GAS proxy returned success: false or invalid response for SKU Focus SPV.");
+      }
+    } else {
+      console.warn(`Local proxy returned status ${response.status} for SKU Focus SPV. Trying direct fetch.`);
+    }
+  } catch (proxyError: any) {
+    if (proxyError.message && proxyError.message.startsWith("LIBRARY_URL_DETECTED:")) {
+      throw proxyError;
+    }
+    console.warn("Proxy fetch nested error for SKU Focus SPV:", proxyError);
+  }
+
+  // 2. Fallback to direct client-side fetch from browser
+  if (!rawData && SKU_FOCUS_SCRIPT_URL) {
+    try {
+      const targetUrl = `${SKU_FOCUS_SCRIPT_URL}?sheet=${encodeURIComponent("SPV Ach")}`;
+      console.log("Attempting direct browser fetch for SKU Focus SPV from:", targetUrl);
+      const response = await fetch(targetUrl);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for SKU Focus SPV succeeded!");
+      } else {
+        throw new Error(`Direct fetch returned status: ${response.status}`);
+      }
+    } catch (directError) {
+      console.error("Direct browser fetch for SKU Focus SPV failed:", directError);
+    }
+  }
+
+  // 3. Process and map retrieved raw JSON payload if successful
+  if (rawData) {
+    try {
+      const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
+
+      let arrayData: any[] = [];
+      if (Array.isArray(payloadObj)) {
+        arrayData = payloadObj;
+      } else if (payloadObj && typeof payloadObj === "object") {
+        if (Array.isArray(payloadObj.data)) {
+          arrayData = payloadObj.data;
+        } else if (Array.isArray(payloadObj.rows)) {
+          arrayData = payloadObj.rows;
+        } else if (Array.isArray(payloadObj.records)) {
+          arrayData = payloadObj.records;
+        } else {
+          const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
+          if (possibleArray) {
+            arrayData = possibleArray;
+          }
+        }
+      }
+
+      if (arrayData && arrayData.length > 0) {
+        const mappedData = arrayData.map((item: any) => {
+          const itemNormalized: Record<string, any> = {};
+          for (const k of Object.keys(item)) {
+            const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            itemNormalized[cleanK] = item[k];
+          }
+
+          const findString = (exactAndAliases: string[], defaultValue = "Unknown"): string => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                return String(itemNormalized[cleanK]).trim() || defaultValue;
+              }
+            }
+            return defaultValue;
+          };
+
+          const findValue = (exactAndAliases: string[], defaultValue = 0): number => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                const val = itemNormalized[cleanK];
+                if (typeof val === "number") return val;
+                const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+                const num = Number(cleaned);
+                return isNaN(num) ? defaultValue : num;
+              }
+            }
+            return defaultValue;
+          };
+
+          return {
+            region: findString(["region", "wilayah", "area"]),
+            distributor_name: findString(["distributor_name", "distributor", "nama_distributor"]),
+            asm: findString(["asm", "nama_asm", "area_sales_manager"]),
+            spv: findString(["spv", "supervisor", "nama_supervisor", "nama_spv"]),
+            distributor_se: findString(["distributor_se", "se", "sales_executive", "se_distributor"]),
+            sku: findString(["sku", "product", "nama_sku", "product_sku", "item"]),
+            st_eligible: findValue(["st_eligible", "steligible", "eligible_st", "eligible_st_value"]),
+            ao: findValue(["ao", "active_outlet", "ach_ao", "ach_active_outlet"]),
+            target_ao: findValue(["target_ao", "targetactiveoutlet", "target_active_outlet"]),
+            target_st: findValue(["target_st", "target_sell_through", "target_st_value", "targetst"])
+          };
+        });
+
+        cachedSKUSPVData = mappedData;
+        lastSKUSPVFetchTime = now;
+        return mappedData;
+      }
+    } catch (mappingError) {
+      console.error("Error parsing or mapping SKU Focus SPV keys:", mappingError);
+    }
+  }
+
+  // 4. Last fallback if both connection steps failed
+  if (cachedSKUSPVData) return cachedSKUSPVData;
+  console.warn("Both local API proxy and direct browser fetch failed for SKU Focus SPV; using mapped mockup data.");
+  const fallback = generateMockSKUFocusSPVData();
+  const mappedWithFallback = fallback.map(item => ({
+    ...item,
+    _isFallback: true
+  }));
+  cachedSKUSPVData = mappedWithFallback;
+  lastSKUSPVFetchTime = now;
+  return mappedWithFallback;
+}
+
+export function generateMockSKUFocusStoreData(): SKUFocusStoreData[] {
+  const skus = [
+    "SKINTIFIC Mugwort Clay Mask 55g",
+    "SKINTIFIC 5X Ceramide Barrier Gel 30g",
+    "SKINTIFIC Glycolic Peeling Gel 50ml",
+    "GLAD2GLOW Blueberry Moisturizer 30g",
+    "GLAD2GLOW Centella Gel Cleanser 120ml"
+  ];
+  const regions = ["East Kalimantan", "South Kalimantan", "West Kalimantan"];
+  const distributors = [
+    { name: "PT Sinar Baru", region: "East Kalimantan", asm: "Hasan Basri", spvs: ["Andi Wijaya", "Siti Rahma"] },
+    { name: "PT Mandiri Abadi", region: "South Kalimantan", asm: "Budi Santoso", spvs: ["Rahmat Hidayat", "Dewi Lestari"] },
+    { name: "PT Cahaya Borneo", region: "West Kalimantan", asm: "Yusuf Indra", spvs: ["Eko Prasetyo", "Indah Permata"] }
+  ];
+  const ses = ["SE Joni", "SE Doni", "SE Clara", "SE Roni", "SE Tina", "SE Linda"];
+
+  const data: SKUFocusStoreData[] = [];
+
+  for (let i = 1; i <= 60; i++) {
+    const dist = distributors[i % distributors.length];
+    const spv = dist.spvs[i % dist.spvs.length];
+    const se = ses[i % ses.length];
+    const sku = skus[i % skus.length];
+    
+    const qty = Math.floor(Math.random() * 80) + 15;
+    const price = sku.includes("SKINTIFIC") ? 139000 : 49000;
+    const st = qty * price;
+    const isEligible = Math.random() > 0.3;
+    const eligibility = isEligible ? "Eligible" : "Not Eligible";
+    const eligible_st = isEligible ? st : 0;
+
+    data.push({
+      region: dist.region,
+      distributor_name: dist.name,
+      cust_id: `CUST${1000 + i}`,
+      cust_name: `Store ${String.fromCharCode(65 + (i % 26))} ${dist.region.split(' ')[0]}`,
+      asm: dist.asm,
+      spv: spv,
+      distributor_se: se,
+      sku: sku,
+      qty,
+      st,
+      eligible_st,
+      eligibility
+    });
+  }
+
+  return data;
+}
+
+export function generateMockSKUFocusSPVData(): SKUFocusSPVData[] {
+  const skus = [
+    "SKINTIFIC Mugwort Clay Mask 55g",
+    "SKINTIFIC 5X Ceramide Barrier Gel 30g",
+    "SKINTIFIC Glycolic Peeling Gel 50ml",
+    "GLAD2GLOW Blueberry Moisturizer 30g",
+    "GLAD2GLOW Centella Gel Cleanser 120ml"
+  ];
+  const distributors = [
+    { name: "PT Sinar Baru", region: "East Kalimantan", asm: "Hasan Basri", spvs: ["Andi Wijaya", "Siti Rahma"] },
+    { name: "PT Mandiri Abadi", region: "South Kalimantan", asm: "Budi Santoso", spvs: ["Rahmat Hidayat", "Dewi Lestari"] },
+    { name: "PT Cahaya Borneo", region: "West Kalimantan", asm: "Yusuf Indra", spvs: ["Eko Prasetyo", "Indah Permata"] }
+  ];
+  const ses = ["SE Joni", "SE Doni", "SE Clara", "SE Roni", "SE Tina", "SE Linda"];
+
+  const data: SKUFocusSPVData[] = [];
+
+  distributors.forEach((dist) => {
+    dist.spvs.forEach((spv, spvIdx) => {
+      skus.forEach((sku, skuIdx) => {
+        const se = ses[(spvIdx + skuIdx) % ses.length];
+        const target_st = (sku.includes("SKINTIFIC") ? 10000000 : 4000000) * (Math.floor(Math.random() * 3) + 1);
+        const st_eligible = Math.floor(target_st * (0.6 + Math.random() * 0.7));
+        const target_ao = Math.floor(Math.random() * 12) + 8;
+        const ao = Math.floor(target_ao * (0.5 + Math.random() * 0.6));
+
+        data.push({
+          region: dist.region,
+          distributor_name: dist.name,
+          asm: dist.asm,
+          spv: spv,
+          distributor_se: se,
+          sku: sku,
+          st_eligible,
+          ao,
+          target_ao,
+          target_st
+        });
+      });
+    });
+  });
+
   return data;
 }

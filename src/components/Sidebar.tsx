@@ -40,6 +40,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
     const poChecker = SIDEBAR_ITEMS.find(i => i.name === 'PO Checker');
     const programTracker = SIDEBAR_ITEMS.find(i => i.name === 'Program Tracker');
     const skuList = SIDEBAR_ITEMS.find(i => i.name === 'Product Catalog');
+    const skuFocus = SIDEBAR_ITEMS.find(i => i.name === 'SKU Focus');
 
     return [
       sellIn && { type: 'item' as const, item: sellIn },
@@ -56,6 +57,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
         ].filter(Boolean) as typeof SIDEBAR_ITEMS
       },
       skuList && { type: 'item' as const, item: skuList },
+      skuFocus && { type: 'item' as const, item: skuFocus },
       poChecker && { type: 'item' as const, item: poChecker },
       programTracker && { type: 'item' as const, item: programTracker }
     ].filter(Boolean);

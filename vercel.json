@@ -15,7 +15,7 @@
     },
     {
       "source": "/api/incentives-se",
-      "destination": "https://script.google.com/macros/s/AKfycbG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec"
+      "destination": "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec"
     },
     {
       "source": "/api/sell-out",
@@ -24,6 +24,10 @@
     {
       "source": "/api/product-catalog",
       "destination": "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec"
+    },
+    {
+      "source": "/api/sku-focus",
+      "destination": "https://script.google.com/macros/s/AKfycbzL5ZJpP_placeholder_skufocus/exec"
     },
     {
       "source": "/(.*)",

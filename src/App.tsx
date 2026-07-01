@@ -20,6 +20,7 @@ import IncentivesSPVExclusiveTable from "./components/IncentivesSPVExclusiveTabl
 import IncentivesSETable from "./components/IncentivesSETable";
 import SellOutDashboard from "./components/SellOutDashboard";
 import { SKUList } from "./components/SKUList";
+import SKUFocusPage from "./components/SKUFocusPage";
 
 export default function App() {
   const [data, setData] = useState<SalesData[]>([]);
@@ -511,6 +512,8 @@ export default function App() {
       <main className={cn("transition-all duration-500 p-8 max-w-[1500px] mx-auto", isSidebarCollapsed ? "pl-28" : "pl-72")}>
         {activeMenu === 'Product Catalog' ? (
           <SKUList />
+        ) : activeMenu === 'SKU Focus' ? (
+          <SKUFocusPage />
         ) : (
           <>
             <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-50">

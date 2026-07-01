@@ -13,7 +13,8 @@ import {
   UserCheck, 
   ClipboardCheck, 
   Truck,
-  Package
+  Package,
+  Target
 } from "lucide-react";
 
 export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolean }[] = [
@@ -26,6 +27,7 @@ export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolea
   { name: 'PO Checker', icon: ClipboardCheck, isComingSoon: true },
   { name: 'Program Tracker', icon: Truck, isComingSoon: true },
   { name: 'Product Catalog', icon: Package, isComingSoon: false },
+  { name: 'SKU Focus', icon: Target, isComingSoon: false },
 ];
 
 export const COLORS = {

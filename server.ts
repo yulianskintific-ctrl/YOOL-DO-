@@ -167,6 +167,66 @@ app.get("/api/sell-out", async (req, res) => {
   }
 });
 
+// API route to proxy SKU Focus records (modular & separate)
+app.get("/api/sku-focus", async (req, res) => {
+  try {
+    const SKU_FOCUS_SCRIPT_URL = process.env.SKU_FOCUS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxwAD5bkdKM_bJ4v25FQT9neXHRXMnXqzlIUaKje1xCqPqB9wbrn40EbcxSDtEXaMgUuw/exec";
+    if (!SKU_FOCUS_SCRIPT_URL || SKU_FOCUS_SCRIPT_URL.includes("placeholder") || SKU_FOCUS_SCRIPT_URL.includes("Placeholder") || !SKU_FOCUS_SCRIPT_URL.startsWith("https://")) {
+      // Return a clean fallback response indicating unconfigured state
+      return res.json({
+        success: false,
+        isDemo: true,
+        message: "SKU Focus script URL is not configured. Using demo mode.",
+        data: []
+      });
+    }
+
+    if (SKU_FOCUS_SCRIPT_URL.includes("/macros/library/") || SKU_FOCUS_SCRIPT_URL.includes("/edit") || !SKU_FOCUS_SCRIPT_URL.includes("/exec")) {
+      return res.json({
+        success: false,
+        errorType: "LIBRARY_URL_DETECTED",
+        message: "Anda memasukkan link Library/Editor Google Apps Script. Silakan deploy project tersebut sebagai Web App ('Deploy > New Deployment', pilih 'Web App', akses: 'Anyone') lalu masukkan URL '/exec' yang dihasilkan ke secrets/env SKU_FOCUS_SCRIPT_URL.",
+        data: []
+      });
+    }
+
+    const sheetName = req.query.sheet ? String(req.query.sheet) : "Store Ach";
+    const targetUrl = `${SKU_FOCUS_SCRIPT_URL}?sheet=${encodeURIComponent(sheetName)}`;
+    console.log(`[Proxy] Fetching SKU Focus (${sheetName}) data from GAS: ${targetUrl}`);
+
+    const response = await fetch(targetUrl);
+    
+    // Check for 403 Forbidden
+    if (response.status === 403) {
+      console.log(`[Proxy] SKU Focus Google Apps Script returned status 403 (Forbidden). Check deployment permissions.`);
+      return res.json({
+        success: false,
+        errorType: "403_FORBIDDEN",
+        message: "Google Apps Script returned status 403. Please deploy with 'Who has access: Anyone' and 'Execute as: Me'.",
+        data: []
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Google Apps Script responder returned status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log(`[Proxy] Successfully retrieved ${Array.isArray(data) ? data.length : typeof data} records for SKU Focus.`);
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (err: any) {
+    console.log(`[Proxy] SKU Focus data fallback: ${err.message || err}`);
+    res.json({
+      success: false,
+      errorType: "FETCH_FAILURE",
+      message: err.message || "Failed to fetch SKU Focus data from script",
+      data: []
+    });
+  }
+});
+
 // API route to proxy Product Catalog Google Sheets / Apps Script data
 app.get("/api/product-catalog", async (req, res) => {
   try {

@@ -121,7 +121,37 @@ export interface DashboardMetrics {
   topASM: string;
 }
 
-export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'PO Checker' | 'Program Tracker' | 'Product Catalog';
+export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'PO Checker' | 'Program Tracker' | 'Product Catalog' | 'SKU Focus';
+
+export interface SKUFocusStoreData {
+  region: string;
+  distributor_name: string;
+  cust_id: string;
+  cust_name: string;
+  asm: string;
+  spv: string;
+  distributor_se: string;
+  sku: string;
+  qty: number;
+  st: number;
+  eligible_st: number;
+  eligibility: string;
+  _isFallback?: boolean;
+}
+
+export interface SKUFocusSPVData {
+  region: string;
+  distributor_name: string;
+  asm: string;
+  spv: string;
+  distributor_se: string;
+  sku: string;
+  st_eligible: number;
+  ao: number;
+  target_ao: number;
+  target_st: number;
+  _isFallback?: boolean;
+}
 
 export interface FilterState {
   startDate: string;
