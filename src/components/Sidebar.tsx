@@ -30,7 +30,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
 
   const isAnySubItemActive = ["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE"].includes(activeMenu);
 
-  const menuStructure = useMemo(() => {
+  const menuStructure = useMemo<any[]>(() => {
     const sellIn = SIDEBAR_ITEMS.find(i => i.name === 'Sell In');
     const sellThrough = SIDEBAR_ITEMS.find(i => i.name === 'Sell Through');
     const sellOut = SIDEBAR_ITEMS.find(i => i.name === 'Sell Out');
@@ -46,15 +46,11 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
       sellIn && { type: 'item' as const, item: sellIn },
       sellThrough && { type: 'item' as const, item: sellThrough },
       sellOut && { type: 'item' as const, item: sellOut },
-      {
+      (spvInternal || spvExclusive || seIncentives) && {
         type: 'group' as const,
         name: 'Incentives',
         icon: Coins,
-        subItems: [
-          spvInternal,
-          spvExclusive,
-          seIncentives
-        ].filter(Boolean) as typeof SIDEBAR_ITEMS
+        subItems: [spvInternal, spvExclusive, seIncentives].filter(Boolean)
       },
       skuList && { type: 'item' as const, item: skuList },
       skuFocus && { type: 'item' as const, item: skuFocus },

@@ -806,8 +806,8 @@ export async function fetchIncentiveSEData(forceRefresh = false): Promise<Incent
         
         incentive_gmv: findValue(["INCENTIVES GMV", "incentive_gmv", "incentive gmv", "incentives gmv", "bonus gmv"]),
         incentive_ao: findValue(["INCENTIVES AO", "incentive_ao", "incentive ao", "incentives ao", "bonus ao"]),
-        incentive_st_focus: findValue(["INCENTIVES ST FOCUS", "incentive_st_focus", "incentive st focus", "incentives st focus", "bonus st focus"]),
-        incentive_ao_focus: findValue(["INCENTIVES AO FOCUS", "incentive_ao_focus", "incentive ao focus", "incentives ao focus", "bonus ao focus"]),
+        incentive_st_focus: findValue(["INCENTIVES ST PRODUCT FOCUS", "incentive st product focus", "incentives st product focus", "bonus st product focus", "INCENTIVES ST FOCUS", "incentive_st_focus", "incentive st focus", "incentives st focus", "bonus st focus"]),
+        incentive_ao_focus: findValue(["INCENTIVES AO PRODUCT FOCUS", "incentive ao product focus", "incentives ao product focus", "bonus ao product focus", "INCENTIVES AO FOCUS", "incentive_ao_focus", "incentive ao focus", "incentives ao focus", "bonus ao focus"]),
         total_incentives: findValue(["TOTAL INCENTIVES", "total_incentives", "total incentives"]),
         _isFallback: false
       };

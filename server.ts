@@ -231,7 +231,8 @@ app.get("/api/sku-focus", async (req, res) => {
 app.get("/api/product-catalog", async (req, res) => {
   try {
     const defaultUrl = "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec";
-    const syncUrl = req.query.url ? String(req.query.url) : defaultUrl;
+    const PRODUCT_CATALOG_SCRIPT_URL = process.env.PRODUCT_CATALOG_SCRIPT_URL || defaultUrl;
+    const syncUrl = req.query.url ? String(req.query.url) : PRODUCT_CATALOG_SCRIPT_URL;
     const method = req.query.method ? String(req.query.method) : "gas";
 
     console.log(`[Proxy] Fetching product catalog via backend. Method: ${method}, URL: ${syncUrl}`);

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { SKU_DATABASE, SKUData } from "../services/skuData";
 import { 
   Search, 
@@ -30,13 +31,27 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
+// Robust brand string normalization to merge variations like "SKINTIFIC", "skintific", "Skintific" and case variations
+export function normalizeBrand(brandStr: string | undefined | null): string {
+  if (!brandStr) return "Skintific";
+  const trimmed = brandStr.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === "skintific") return "Skintific";
+  if (lower === "glad2glow") return "Glad2Glow";
+  // Fallback to capitalizing each word properly
+  return trimmed
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 // Robust Fuzzy Mapping Engine to translate any Google Spreadsheet / Apps Script headers back to standard catalog fields
 function mapFuzzyItem(item: any): SKUData {
   if (!item) return {
     status: "Active",
     productCode: "",
     descriptionProduct: "Unnamed Product",
-    brand: "SKINTIFIC",
+    brand: "Skintific",
     assortment: "Other SKU",
     category: "Skincare",
     segment: "Face",
@@ -49,7 +64,7 @@ function mapFuzzyItem(item: any): SKUData {
   let status = "Active";
   let productCode = "";
   let descriptionProduct = "";
-  let brand = "SKINTIFIC";
+  let brand = "";
   let assortment = "Other SKU";
   let category = "Skincare";
   let segment = "Face";
@@ -87,7 +102,7 @@ function mapFuzzyItem(item: any): SKUData {
     ) {
       descriptionProduct = val ? String(val).trim() : "";
     } else if (key.includes("brand") || key.includes("merk")) {
-      brand = val ? String(val).trim() : "SKINTIFIC";
+      brand = val ? String(val).trim() : "";
     } else if (key.includes("assort") || key.includes("paket")) {
       assortment = val ? String(val).trim() : "Other SKU";
     } else if (key.includes("category") || key.includes("kategori")) {
@@ -126,7 +141,7 @@ function mapFuzzyItem(item: any): SKUData {
     status: status || "Active",
     productCode: finalCode,
     descriptionProduct: finalDesc,
-    brand: brand || "SKINTIFIC",
+    brand: normalizeBrand(brand),
     assortment: assortment || "Other SKU",
     category: category || "Skincare",
     segment: segment || "Face",
@@ -193,6 +208,7 @@ function parseJSONDataToSKUList(json: any): SKUData[] {
 
 export function SKUList() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [selectedAssortment, setSelectedAssortment] = useState<string>("All");
@@ -211,12 +227,28 @@ export function SKUList() {
     try {
       const saved = localStorage.getItem("sku_catalog_custom_database");
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: any) => ({
+            ...item,
+            brand: normalizeBrand(item.brand)
+          }));
+        }
       }
     } catch (e) {
       console.error("Failed to load local storage SKU database, using static fallback:", e);
     }
-    return SKU_DATABASE;
+    return []; // Start empty so there is no simulation data loaded before sheet sync!
+  });
+
+  const [initialLoading, setInitialLoading] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sku_catalog_custom_database");
+      if (saved) {
+        return false;
+      }
+    } catch (e) {}
+    return true;
   });
 
   // Sync state selectors
@@ -298,7 +330,7 @@ export function SKUList() {
       if (item.productCode) {
         item.status = item.status || "Active";
         item.descriptionProduct = item.descriptionProduct || "Unnamed Product";
-        item.brand = item.brand || "SKINTIFIC";
+        item.brand = normalizeBrand(item.brand);
         item.assortment = item.assortment || "Other SKU";
         item.category = item.category || "Skincare";
         item.segment = item.segment || "Face";
@@ -318,7 +350,7 @@ export function SKUList() {
     setSyncMessage("Menghubungkan ke Google Sheets...");
 
     try {
-      const defaultUrl = "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec";
+      const defaultUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_PRODUCT_CATALOG_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec";
       const proxyUrl = `/api/product-catalog?url=${encodeURIComponent(defaultUrl)}&method=gas`;
       let response = await fetch(proxyUrl);
       
@@ -408,11 +440,12 @@ export function SKUList() {
 
   // Extract unique filter values for dropdowns based on active data
   const filterOptions = useMemo(() => {
+    const brands = ["All", ...Array.from(new Set(skuList.map(item => item.brand || "Skintific").filter(Boolean)))];
     const statuses = ["All", ...Array.from(new Set(skuList.map(item => item.status)))];
     const categories = ["All", ...Array.from(new Set(skuList.map(item => item.category)))];
     const assortments = ["All", ...Array.from(new Set(skuList.map(item => item.assortment)))];
     const segments = ["All", ...Array.from(new Set(skuList.map(item => item.segment)))];
-    return { statuses, categories, assortments, segments };
+    return { brands, statuses, categories, assortments, segments };
   }, [skuList]);
 
   // Handle Sort
@@ -440,16 +473,18 @@ export function SKUList() {
       const matchSearch = 
         item.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.descriptionProduct.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.subsegment.toLowerCase().includes(searchTerm.toLowerCase());
+        item.subsegment.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.brand && item.brand.toLowerCase().includes(searchTerm.toLowerCase()));
 
+      const matchBrand = selectedBrand === "All" || item.brand === selectedBrand;
       const matchStatus = selectedStatus === "All" || item.status === selectedStatus;
       const matchCategory = selectedCategory === "All" || item.category === selectedCategory;
       const matchAssortment = selectedAssortment === "All" || item.assortment === selectedAssortment;
       const matchSegment = selectedSegment === "All" || item.segment === selectedSegment;
 
-      return matchSearch && matchStatus && matchCategory && matchAssortment && matchSegment;
+      return matchSearch && matchBrand && matchStatus && matchCategory && matchAssortment && matchSegment;
     });
-  }, [skuList, searchTerm, selectedStatus, selectedCategory, selectedAssortment, selectedSegment]);
+  }, [skuList, searchTerm, selectedBrand, selectedStatus, selectedCategory, selectedAssortment, selectedSegment]);
 
   // Sort logic
   const sortedSKUs = useMemo(() => {
@@ -492,7 +527,7 @@ export function SKUList() {
       await new Promise(resolve => setTimeout(resolve, 600));
       if (!active) return;
 
-      const targetUrl = "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec";
+      const targetUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_PRODUCT_CATALOG_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbzLG2BPCW7O8PXELCNdIgv1v0MHVspqVtYw5PVaqgULS5BhHHyuoA9PED5uoDla-uIrKw/exec";
 
       setIsSyncing(true);
       setSyncStatus("idle");
@@ -552,8 +587,18 @@ export function SKUList() {
         console.warn("[AutoSync Mount Warning] Could not auto-sync:", err);
         if (active) {
           setSyncStatus("error");
-          setSyncMessage("Gagal live sync otomatis. Menggunakan data cache lokal.");
+          setSyncMessage("Gagal live sync otomatis dengan Google Sheets.");
           
+          setSkuList(prev => {
+            if (prev.length === 0) {
+              return SKU_DATABASE.map(item => ({
+                ...item,
+                brand: normalizeBrand(item.brand)
+              }));
+            }
+            return prev;
+          });
+
           setTimeout(() => {
             if (active) {
               setSyncStatus("idle");
@@ -564,6 +609,7 @@ export function SKUList() {
       } finally {
         if (active) {
           setIsSyncing(false);
+          setInitialLoading(false);
         }
       }
     };
@@ -594,22 +640,50 @@ export function SKUList() {
     };
   }, [filteredSKUs]);
 
-  // Download logic mapping to CSV simulated export
-  const exportToCSV = () => {
-    const headers = "Status,Product Code,Description,Brand,Assortment,Category,Segment,Subsegment,SIP (Distributor Price),STP (Store Price)\n";
-    const rows = filteredSKUs.map(item => 
-      `"${item.status}","${item.productCode}","${item.descriptionProduct}","${item.brand}","${item.assortment}","${item.category}","${item.segment}","${item.subsegment}",${item.priceSIP},${item.priceSTP}`
-    ).join("\n");
-    
-    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
+  // Download logic mapping to Excel (.xlsx) export
+  const exportToExcel = () => {
+    const data = filteredSKUs.map(item => ({
+      "Status": item.status,
+      "Product Code": item.productCode,
+      "Description": item.descriptionProduct,
+      "Brand": item.brand,
+      "Assortment": item.assortment,
+      "Category": item.category,
+      "Segment": item.segment,
+      "Subsegment": item.subsegment,
+      "SIP (Distributor Price)": item.priceSIP,
+      "STP (Store Price)": item.priceSTP
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Product Catalog");
+
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Product_Catalog_Database_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Product_Catalog_Database_${new Date().toISOString().split('T')[0]}.xlsx`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
+
+  if (initialLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 bg-white text-blue-600 gap-5">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+          <Database className="w-6 h-6 text-blue-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+        </div>
+        <div className="text-center space-y-1">
+          <h3 className="text-sm font-black tracking-widest text-slate-900 uppercase">YOOL-DO! SYSTEMS</h3>
+          <p className="text-[11px] font-bold text-slate-400 uppercase animate-pulse">Menghubungkan ke Google Sheets Product Catalog...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -638,12 +712,12 @@ export function SKUList() {
           </button>
 
           <button
-            onClick={exportToCSV}
+            onClick={exportToExcel}
             disabled={filteredSKUs.length === 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-600 font-bold text-[10px] tracking-widest uppercase border border-slate-200 hover:border-blue-400 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
           >
-            <Download className="w-3.5 h-3.5" />
-            Export CSV ({filteredSKUs.length})
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            Export Excel ({filteredSKUs.length})
           </button>
         </div>
       </header>
@@ -764,7 +838,7 @@ function doGet(e) {
       } else if (header.indexOf("description") !== -1 || header.indexOf("name") !== -1 || header.indexOf("product") !== -1) {
         item.descriptionProduct = val ? val.toString().trim() : "";
       } else if (header.indexOf("brand") !== -1) {
-        item.brand = val ? val.toString().trim() : "SKINTIFIC";
+        item.brand = val ? val.toString().trim() : "Skintific";
       } else if (header.indexOf("assortment") !== -1 || header.indexOf("paket") !== -1) {
         item.assortment = val ? val.toString().trim() : "Other SKU";
       } else if (header.indexOf("category") !== -1 || header.indexOf("kategori") !== -1) {
@@ -783,7 +857,7 @@ function doGet(e) {
     if (item.productCode) {
       if (!item.status) item.status = "Active";
       if (!item.descriptionProduct) item.descriptionProduct = "Unnamed Product";
-      if (!item.brand) item.brand = "SKINTIFIC";
+      if (!item.brand) item.brand = "Skintific";
       if (!item.assortment) item.assortment = "Other SKU";
       if (!item.category) item.category = "Skincare";
       if (!item.segment) item.segment = "Face";
@@ -917,8 +991,28 @@ function doGet(e) {
           </div>
         </div>
 
-        {/* Second Row of Filters: Category, Assortment, Segment & Status dropdowns */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+        {/* Second Row of Filters: Brand, Category, Assortment, Segment & Status dropdowns */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-1">
+          {/* Brand Dropdown */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 block">
+              Product Brand
+            </label>
+            <select
+              value={selectedBrand}
+              onChange={(e) => {
+                setSelectedBrand(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full text-xs font-bold bg-slate-50 hover:bg-white border border-slate-200 hover:shadow-sm rounded-xl px-4 py-2.5 text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all cursor-pointer"
+            >
+              <option value="All">All Brands</option>
+              {filterOptions.brands.filter(b => b !== "All").map(brand => (
+                <option key={brand} value={brand}>{brand}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Category Dropdown */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 block">
@@ -1001,7 +1095,7 @@ function doGet(e) {
         </div>
 
         {/* Filters Reset Panel */}
-        {(searchTerm || selectedStatus !== "All" || selectedCategory !== "All" || selectedAssortment !== "All" || selectedSegment !== "All") && (
+        {(searchTerm || selectedBrand !== "All" || selectedStatus !== "All" || selectedCategory !== "All" || selectedAssortment !== "All" || selectedSegment !== "All") && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-500 border-t border-slate-50 pt-3">
             <div className="flex items-center gap-2">
               <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -1010,6 +1104,7 @@ function doGet(e) {
             <button
               onClick={() => {
                 setSearchTerm("");
+                setSelectedBrand("All");
                 setSelectedStatus("All");
                 setSelectedCategory("All");
                 setSelectedAssortment("All");
@@ -1034,15 +1129,16 @@ function doGet(e) {
         <div className="overflow-x-auto min-h-[460px] scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
           <table className="w-full min-w-[1200px] text-left border-collapse table-fixed">
             <colgroup>
-              <col className="w-[140px]" />
-              <col className="w-[120px]" />
-              <col className="w-[300px]" />
               <col className="w-[130px]" />
-              <col className="w-[100px]" />
-              <col className="w-[100px]" />
+              <col className="w-[110px]" />
+              <col className="w-[110px]" />
+              <col className="w-[270px]" />
               <col className="w-[120px]" />
-              <col className="w-[140px]" />
-              <col className="w-[140px]" />
+              <col className="w-[90px]" />
+              <col className="w-[90px]" />
+              <col className="w-[110px]" />
+              <col className="w-[130px]" />
+              <col className="w-[130px]" />
             </colgroup>
             <thead>
               <tr className="bg-blue-600 text-white font-black text-[10px] tracking-widest uppercase border-b border-blue-700">
@@ -1060,49 +1156,56 @@ function doGet(e) {
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
-                {/* Column 3: Description Product */}
+                {/* Column 3: Brand */}
+                <th className="px-4 py-3.5 cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("brand")}>
+                  <div className="flex items-center gap-1.5">
+                    Brand
+                    <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                  </div>
+                </th>
+                {/* Column 4: Description Product */}
                 <th className="px-4 py-3.5 cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("descriptionProduct")}>
                   <div className="flex items-center gap-1.5">
                     Description Product
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
-                {/* Column 4: Assortment */}
+                {/* Column 5: Assortment */}
                 <th className="px-4 py-3.5 cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("assortment")}>
                   <div className="flex items-center gap-1.5">
                     Assortment
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
-                {/* Column 5: Category */}
+                {/* Column 6: Category */}
                 <th className="px-4 py-3.5 cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("category")}>
                   <div className="flex items-center gap-1.5">
                     Category
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
-                {/* Column 6: Segment */}
+                {/* Column 7: Segment */}
                 <th className="px-4 py-3.5 cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("segment")}>
                   <div className="flex items-center gap-1.5">
                     Segment
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
-                {/* Column 7: Subsegment */}
+                {/* Column 8: Subsegment */}
                 <th className="px-4 py-3.5 cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("subsegment")}>
                   <div className="flex items-center gap-1.5">
                     Subsegment
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
-                {/* Column 8: Price For Distri (SIP) */}
+                {/* Column 9: Price For Distri (SIP) */}
                 <th className="px-4 py-3.5 text-right cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("priceSIP")}>
                   <div className="flex items-center gap-1.5 justify-end">
                     Price Distri (SIP)
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
-                {/* Column 9: Price For Store (STP) */}
+                {/* Column 10: Price For Store (STP) */}
                 <th className="px-4 py-3.5 text-right cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("priceSTP")}>
                   <div className="flex items-center gap-1.5 justify-end">
                     Price Store (STP)
@@ -1140,7 +1243,11 @@ function doGet(e) {
                       <td className="px-4 py-2.5 font-bold text-slate-900 font-mono tracking-tight text-[11px] truncate">
                         {item.productCode}
                       </td>
-                      {/* Column 3: Description Product */}
+                      {/* Column 3: Brand */}
+                      <td className="px-4 py-2.5 font-bold text-slate-700 truncate">
+                        {item.brand || "Skintific"}
+                      </td>
+                      {/* Column 4: Description Product */}
                       <td className="px-4 py-2.5 font-medium text-slate-800 break-words line-clamp-2 hover:line-clamp-none transition-all duration-200">
                         {item.descriptionProduct}
                       </td>
@@ -1173,7 +1280,7 @@ function doGet(e) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} className="px-4 py-20 text-center text-slate-400">
+                  <td colSpan={10} className="px-4 py-20 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="p-3 bg-slate-50 text-slate-400 rounded-full">
                         <Package className="w-8 h-8" />
