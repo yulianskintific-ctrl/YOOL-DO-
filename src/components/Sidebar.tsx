@@ -18,17 +18,15 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggleCollapse }: SidebarProps) {
-  const [isIncentivesExpanded, setIsIncentivesExpanded] = useState(() => 
-    ["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE"].includes(activeMenu)
-  );
+  const [isIncentivesExpanded, setIsIncentivesExpanded] = useState(true);
 
   useEffect(() => {
-    if (["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE"].includes(activeMenu)) {
+    if (["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE", "Incentives Pertinggal"].includes(activeMenu)) {
       setIsIncentivesExpanded(true);
     }
   }, [activeMenu]);
 
-  const isAnySubItemActive = ["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE"].includes(activeMenu);
+  const isAnySubItemActive = ["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE", "Incentives Pertinggal"].includes(activeMenu);
 
   const menuStructure = useMemo<any[]>(() => {
     const sellIn = SIDEBAR_ITEMS.find(i => i.name === 'Sell In');
@@ -37,6 +35,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
     const spvInternal = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Internal');
     const spvExclusive = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Exclusive');
     const seIncentives = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SE');
+    const incentivesLeftBehind = SIDEBAR_ITEMS.find(i => i.name === 'Incentives Pertinggal');
     const poChecker = SIDEBAR_ITEMS.find(i => i.name === 'PO Checker');
     const programTracker = SIDEBAR_ITEMS.find(i => i.name === 'Program Tracker');
     const skuList = SIDEBAR_ITEMS.find(i => i.name === 'Product Catalog');
@@ -46,11 +45,11 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
       sellIn && { type: 'item' as const, item: sellIn },
       sellThrough && { type: 'item' as const, item: sellThrough },
       sellOut && { type: 'item' as const, item: sellOut },
-      (spvInternal || spvExclusive || seIncentives) && {
+      (spvInternal || spvExclusive || seIncentives || incentivesLeftBehind) && {
         type: 'group' as const,
         name: 'Incentives',
         icon: Coins,
-        subItems: [spvInternal, spvExclusive, seIncentives].filter(Boolean)
+        subItems: [spvInternal, spvExclusive, seIncentives, incentivesLeftBehind].filter(Boolean)
       },
       skuList && { type: 'item' as const, item: skuList },
       skuFocus && { type: 'item' as const, item: skuFocus },
@@ -228,7 +227,9 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
                                   ? "INT" 
                                   : subItem.name.includes("Exclusive") 
                                     ? "EXC" 
-                                    : "SE"}
+                                    : subItem.name.includes("SE")
+                                      ? "SE"
+                                      : "PTG"}
                               </span>
                             ) : (
                               <span className="truncate text-left">{subItem.name}</span>

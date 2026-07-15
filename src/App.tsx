@@ -21,6 +21,7 @@ import IncentivesSETable from "./components/IncentivesSETable";
 import SellOutDashboard from "./components/SellOutDashboard";
 import { SKUList } from "./components/SKUList";
 import SKUFocusPage from "./components/SKUFocusPage";
+import IncentivesLeftBehind from "./components/IncentivesLeftBehind";
 
 export default function App() {
   const [data, setData] = useState<SalesData[]>([]);
@@ -514,6 +515,14 @@ export default function App() {
           <SKUList />
         ) : activeMenu === 'SKU Focus' ? (
           <SKUFocusPage />
+        ) : activeMenu === 'Incentives Pertinggal' ? (
+          <div className="space-y-6">
+            <header className="mb-10 pb-8 border-b border-slate-50">
+              <h2 className="text-4xl font-black tracking-tight text-slate-900 mb-1">Incentives Tertinggal</h2>
+              <p className="text-slate-400 text-sm font-medium">Quick access spreadsheets for historical incentive distributions.</p>
+            </header>
+            <IncentivesLeftBehind />
+          </div>
         ) : (
           <>
             <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-50">

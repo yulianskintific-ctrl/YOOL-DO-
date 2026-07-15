@@ -88,10 +88,59 @@ export async function fetchSalesData(forceRefresh = false, sheetName = "Sell In 
     return cachedData[sheetName];
   }
 
+  let rawData: any = null;
+
+  // 1. Attempt local proxy
   try {
     const response = await fetch(`/api/sales-data?sheet=${encodeURIComponent(sheetName)}`);
-    if (!response.ok) throw new Error("Failed to fetch data from GAS");
-    const rawData = await response.json();
+    if (response.ok) {
+      const text = await response.text();
+      // Check if it is HTML or redirect rather than JSON
+      if (text.trim().startsWith("<") || text.includes("<html") || text.includes("<!DOCTYPE html>") || text.includes("Google Accounts")) {
+        console.warn("Local proxy returned HTML/redirect instead of JSON for sales data. Trying direct fetch.");
+      } else {
+        rawData = JSON.parse(text);
+      }
+    } else {
+      console.warn(`Local proxy returned status ${response.status} for sales-data. Trying direct browser fetch.`);
+    }
+  } catch (proxyError) {
+    console.warn("Proxy fetch nested error for sales-data:", proxyError);
+  }
+
+  // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
+  if (!rawData && SCRIPT_URL) {
+    try {
+      console.log(`Attempting direct browser fetch for ${sheetName} from:`, SCRIPT_URL);
+      const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheetName)}`;
+      const response = await fetch(targetUrl);
+      if (response.ok) {
+        const text = await response.text();
+        if (text.trim().startsWith("<") || text.includes("<html") || text.includes("<!DOCTYPE html>") || text.includes("Google Accounts")) {
+          console.warn("Direct browser fetch returned HTML instead of JSON for sales data.");
+        } else {
+          rawData = JSON.parse(text);
+          console.log(`Direct browser fetch for ${sheetName} succeeded!`);
+        }
+      } else {
+        throw new Error(`Direct fetch returned status: ${response.status}`);
+      }
+    } catch (directError) {
+      console.error(`Direct browser fetch for ${sheetName} failed:`, directError);
+    }
+  }
+
+  try {
+    if (!rawData) {
+      console.warn(`Both proxy and direct fetch failed for ${sheetName}. Using local fallback mockup data.`);
+      if (cachedData[sheetName]) return cachedData[sheetName];
+      return generateMockSalesData();
+    }
+
+    if (!Array.isArray(rawData)) {
+      console.error("Sales data did not return an array. Received:", rawData);
+      throw new Error("API response is not a valid JSON array");
+    }
     
     const mappedData = rawData.map((item: any) => ({
       brand_of: item.brand_of || "Unknown",

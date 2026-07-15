@@ -14,7 +14,8 @@ import {
   ClipboardCheck, 
   Truck,
   Package,
-  Target
+  Target,
+  ExternalLink
 } from "lucide-react";
 
 export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolean }[] = [
@@ -24,6 +25,7 @@ export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolea
   { name: 'Incentives SPV Internal', icon: Coins, isComingSoon: false },
   { name: 'Incentives SPV Exclusive', icon: Crown, isComingSoon: false },
   { name: 'Incentives SE', icon: UserCheck, isComingSoon: false },
+  { name: 'Incentives Pertinggal', icon: ExternalLink, isComingSoon: false },
   { name: 'PO Checker', icon: ClipboardCheck, isComingSoon: true },
   { name: 'Program Tracker', icon: Truck, isComingSoon: true },
   { name: 'Product Catalog', icon: Package, isComingSoon: false },
