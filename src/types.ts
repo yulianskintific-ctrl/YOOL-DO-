@@ -121,7 +121,28 @@ export interface DashboardMetrics {
   topASM: string;
 }
 
-export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'Incentives Pertinggal' | 'PO Checker' | 'Program Tracker' | 'Product Catalog' | 'SKU Focus';
+export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'Incentives Pertinggal' | 'PO Checker' | 'Program Tracker' | 'Product Catalog' | 'SKU Focus' | 'Category Analysis' | 'Stock Analysis';
+
+export interface StockAnalysisData {
+  update_date?: string;
+  distributor?: string;
+  product_code?: string;
+  item_id?: string;
+  sku?: string;
+  soh_qty?: number;
+  in_transit_stock_qty?: number;
+  total_transit?: number;
+  avg_am_l3m_qty?: number;
+  last_month_st_qty?: number;
+  brand?: string;
+  avg_st_l3m?: number;
+  stock_total?: number;
+  woi_st_l3m?: number;
+  death_stock_flag?: string;
+  remarks_woi?: string;
+  po_remarks?: string;
+  _isFallback?: boolean;
+}
 
 export interface SKUFocusStoreData {
   region: string;
@@ -168,3 +189,18 @@ export interface FilterState {
   segments?: string[];
   baStoreNonBaStores?: string[];
 }
+
+export interface CategoryAnalysisData {
+  source_of: string;
+  month: string;
+  region: string;
+  distributor_name: string;
+  item_id: string;
+  sku: string;
+  total_quantity: number;
+  sell_through_value: number;
+  sell_out_value: number;
+  category: string;
+  _isFallback?: boolean;
+}
+

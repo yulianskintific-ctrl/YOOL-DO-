@@ -25,7 +25,8 @@ import {
   TrendingUp,
   Award,
   Store,
-  Target
+  Target,
+  Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { fetchSKUFocusStoreData, fetchSKUFocusSPVData } from "../services/api";
@@ -668,9 +669,12 @@ function doGet(e) {
       {/* Main Table Segment */}
       <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 text-blue-600 gap-3">
-            <RefreshCw className="animate-spin w-8 h-8 text-blue-800" />
-            <span className="text-xs font-black tracking-widest text-slate-400 uppercase animate-pulse">Loading SKU Focus Records...</span>
+          <div className="flex flex-col items-center justify-center py-24 text-blue-600 gap-4">
+            <Loader2 className="animate-spin w-10 h-10" />
+            <div className="text-center">
+              <span className="font-black tracking-[0.3em] text-xs uppercase block mb-1">YOOL-DO! SYSTEMS</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase animate-pulse">Loading SKU Focus Records...</span>
+            </div>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 p-6 text-center">

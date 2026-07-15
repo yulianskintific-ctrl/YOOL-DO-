@@ -27,7 +27,8 @@ import {
   AlertCircle,
   Copy,
   Code,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Loader2
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -672,14 +673,11 @@ export function SKUList() {
 
   if (initialLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 bg-white text-blue-600 gap-5">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
-          <Database className="w-6 h-6 text-blue-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-        </div>
-        <div className="text-center space-y-1">
-          <h3 className="text-sm font-black tracking-widest text-slate-900 uppercase">YOOL-DO! SYSTEMS</h3>
-          <p className="text-[11px] font-bold text-slate-400 uppercase animate-pulse">Menghubungkan ke Google Sheets Product Catalog...</p>
+      <div className="flex flex-col items-center justify-center py-32 bg-white text-blue-600 gap-4">
+        <Loader2 className="animate-spin w-10 h-10" />
+        <div className="text-center">
+          <span className="font-black tracking-[0.3em] text-xs uppercase block mb-1">YOOL-DO! SYSTEMS</span>
+          <span className="text-[10px] font-bold text-slate-400 uppercase animate-pulse">Menghubungkan ke Google Sheets Product Catalog...</span>
         </div>
       </div>
     );

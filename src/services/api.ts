@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData, SKUFocusStoreData, SKUFocusSPVData } from "../types";
+import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData, SKUFocusStoreData, SKUFocusSPVData, CategoryAnalysisData, StockAnalysisData } from "../types";
 
 /**
  * SALIN & TEMPEL KODE INI KE GOOGLE APPS SCRIPT:
@@ -1548,4 +1548,685 @@ export function generateMockSKUFocusSPVData(): SKUFocusSPVData[] {
   });
 
   return data;
+}
+
+export const CATEGORY_ANALYSIS_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_CATEGORY_ANALYSIS_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbykWuGTeAZCcPzWXSUYY53nLFcLcRnaPkZI3efxus-oWz5b4NuFI5EUyz854TwGkQzr/exec";
+
+let cachedCategoryAnalysisData: CategoryAnalysisData[] | null = null;
+let lastCategoryAnalysisFetchTime = 0;
+
+export async function fetchCategoryAnalysisData(forceRefresh = false): Promise<CategoryAnalysisData[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedCategoryAnalysisData && (now - lastCategoryAnalysisFetchTime < CACHE_DURATION)) {
+    console.log("Returning cached Category Analysis data");
+    return cachedCategoryAnalysisData;
+  }
+
+  let rawData: any = null;
+  let lastErrorMessage = "";
+
+  // 1. First attempt: fetch via local Node proxy route
+  try {
+    const response = await fetch(`/api/category-analysis`);
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success !== false) {
+        rawData = json;
+      } else {
+        lastErrorMessage = json?.message || "GAS proxy returned success: false or invalid response.";
+        console.warn("GAS proxy returned success: false or invalid response for Category Analysis:", lastErrorMessage);
+      }
+    } else {
+      lastErrorMessage = `Local proxy returned status ${response.status}`;
+      console.warn(`Local proxy returned status ${response.status} for Category Analysis. Trying direct browser fetch.`);
+    }
+  } catch (proxyError: any) {
+    lastErrorMessage = proxyError?.message || String(proxyError);
+    console.warn("Proxy fetch nested error for Category Analysis:", proxyError);
+  }
+
+  // 2. Second attempt: fallback to direct GAS browser fetch
+  const scriptUrl = CATEGORY_ANALYSIS_SCRIPT_URL;
+  if (!rawData && scriptUrl && scriptUrl.startsWith("https://")) {
+    try {
+      console.log("Attempting direct browser fetch for Category Analysis from:", scriptUrl);
+      const response = await fetch(scriptUrl);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for Category Analysis succeeded!");
+      } else {
+        lastErrorMessage = `Direct fetch returned status: ${response.status}`;
+        throw new Error(lastErrorMessage);
+      }
+    } catch (directError: any) {
+      lastErrorMessage = directError?.message || String(directError);
+      console.error("Direct browser fetch for Category Analysis failed:", directError);
+    }
+  }
+
+  // 3. Map retrieved JSON payload
+  if (rawData) {
+    try {
+      const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
+
+      let arrayData: any[] = [];
+      if (Array.isArray(payloadObj)) {
+        arrayData = payloadObj;
+      } else if (payloadObj && typeof payloadObj === "object") {
+        if (Array.isArray(payloadObj.data)) {
+          arrayData = payloadObj.data;
+        } else if (Array.isArray(payloadObj.rows)) {
+          arrayData = payloadObj.rows;
+        } else if (Array.isArray(payloadObj.records)) {
+          arrayData = payloadObj.records;
+        } else {
+          const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
+          if (possibleArray) {
+            arrayData = possibleArray;
+          } else {
+            console.error("No recognizable array found in Google Apps Script response for Category Analysis");
+          }
+        }
+      }
+
+      if (arrayData.length > 0) {
+        console.log("Fetched Category Analysis records:", arrayData.length);
+
+        const mappedData = arrayData.map((item: any) => {
+          const itemNormalized: Record<string, any> = {};
+          for (const k of Object.keys(item)) {
+            const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            itemNormalized[cleanK] = item[k];
+          }
+
+          const findString = (exactAndAliases: string[], defaultValue = "Unknown"): string => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                return String(itemNormalized[cleanK]).trim() || defaultValue;
+              }
+            }
+            for (const key of exactAndAliases) {
+              const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              for (const rawK of Object.keys(itemNormalized)) {
+                if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
+                  return String(itemNormalized[rawK]).trim() || defaultValue;
+                }
+              }
+            }
+            return defaultValue;
+          };
+
+          const findValue = (exactAndAliases: string[], defaultValue = 0): number => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                const val = itemNormalized[cleanK];
+                if (typeof val === "number") return val;
+                const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+                const num = Number(cleaned);
+                return isNaN(num) ? defaultValue : num;
+              }
+            }
+            for (const key of exactAndAliases) {
+              const lowerKey = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              for (const rawK of Object.keys(itemNormalized)) {
+                if (rawK.includes(lowerKey) || lowerKey.includes(rawK)) {
+                  const val = itemNormalized[rawK];
+                  if (typeof val === "number") return val;
+                  const cleaned = String(val).replace(/Rp|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+                  const num = Number(cleaned);
+                  return isNaN(num) ? defaultValue : num;
+                }
+              }
+            }
+            return defaultValue;
+          };
+
+          return {
+            source_of: findString(["source_of", "source", "sourceof", "asal_data"]),
+            month: findString(["month", "bulan"]),
+            region: findString(["region", "wilayah", "daerah"]),
+            distributor_name: findString(["distributor", "distributor_name", "distributorname", "nama_distributor"]),
+            item_id: findString(["item_id", "itemid", "sku_id", "id_barang"]),
+            sku: findString(["sku", "nama_barang", "product"]),
+            total_quantity: findValue(["total_quantity", "quantity", "qty", "jumlah_qty"]),
+            sell_through_value: findValue(["sell_through_value", "sell_through", "sellthrough"]),
+            sell_out_value: findValue(["sell_out_value", "sell_out", "sellout", "value", "nilai_jual"]),
+            category: findString(["category", "kategori"]),
+            _isFallback: false
+          };
+        });
+
+        cachedCategoryAnalysisData = mappedData;
+        lastCategoryAnalysisFetchTime = now;
+        return mappedData;
+      }
+    } catch (parseErr: any) {
+      console.error("Failed to parse retrieved Category Analysis data, falling back to mock:", parseErr);
+      if (forceRefresh) {
+        throw new Error(`Data parsing error: ${parseErr?.message || parseErr}`);
+      }
+    }
+  }
+
+  if (forceRefresh) {
+    throw new Error(lastErrorMessage || "Failed to sync spreadsheet. Connection failed or Google Apps Script returned invalid response.");
+  }
+
+  // Fallback to High-Fidelity Mock
+  console.log("Using High-Fidelity local mock Category Analysis data");
+  const mockData = generateMockCategoryAnalysisData();
+  cachedCategoryAnalysisData = mockData;
+  lastCategoryAnalysisFetchTime = now;
+  return mockData;
+}
+
+export function generateMockCategoryAnalysisData(): CategoryAnalysisData[] {
+  const regions = [
+    { name: "East Kalimantan", distributor: "PT TRIJAYA ADHIRAJA ABADI - BALIKPAPAN" },
+    { name: "South Kalimantan", distributor: "PT MULTI PERSADA BORNEO - BANJARMASIN" },
+    { name: "West Kalimantan", distributor: "PT BORNEO SENTOSA UTAMA - PONTIANAK" },
+    { name: "North Sulawesi", distributor: "PT SULAWESI GLOBAL NIAGA - MANADO" }
+  ];
+
+  const baseItems = [
+    { item_id: "SKINTIFIC-01", sku: "SKINTIFIC 5X CERAMIDE LOW PH CLEANSER", category: "CLEANSER", qty: 19, sell_out_value: 1448370 },
+    { item_id: "SKINTIFIC-02", sku: "SKINTIFIC 4D HYALURONIC ACID TONER", category: "TONER", qty: 11, sell_out_value: 982520 },
+    { item_id: "SKINTIFIC-04", sku: "SKINTIFIC 10% NIACINAMIDE BRIGHTENING SERUM", category: "SERUM", qty: 102, sell_out_value: 10917060 },
+    { item_id: "SKINTIFIC-05", sku: "SKINTIFIC 5X CERAMIDE BARRIER MOISTURE GEL", category: "MOISTURIZER", qty: 340, sell_out_value: 36390200 },
+    { item_id: "SKINTIFIC-06", sku: "SKINTIFIC 5% AHA BHA PHA EXFOLIATING TONER", category: "TONER", qty: 5, sell_out_value: 446600 },
+    { item_id: "SKINTIFIC-07", sku: "SKINTIFIC 2% SALICYLIC ACID ANTI ACNE SERUM", category: "SERUM", qty: 27, sell_out_value: 2889810 },
+    { item_id: "SKINTIFIC-08", sku: "SKINTIFIC MUGWORT ANTI PORE CLAY MASK", category: "TREATMENT", qty: 12, sell_out_value: 912912 },
+    { item_id: "SKINTIFIC-09", sku: "SKINTIFIC 360 CRYSTAL MASSAGE EYE CREAM", category: "TREATMENT", qty: 7, sell_out_value: 910910 },
+    { item_id: "SKINTIFIC-10", sku: "LIGHT SERUM SUNSCREEN SPF50", category: "SUNSCREEN", qty: 35, sell_out_value: 2668050 },
+    { item_id: "SKINTIFIC-105", sku: "SKINTIFIC TRUFFLE BIOME SKIN CREAM", category: "MOISTURIZER", qty: 9, sell_out_value: 1032570 },
+    { item_id: "SKINTIFIC-114", sku: "SKINTIFIC 3X ACID ACNE CARE GEL MOISTURIZER", category: "MOISTURIZER", qty: 44, sell_out_value: 4709320 },
+    { item_id: "SKINTIFIC-12", sku: "SKINTIFIC 5X CERAMIDE SOOTHING CREAM", category: "TONER", qty: 35, sell_out_value: 3126200 },
+    { item_id: "SKINTIFIC-120", sku: "SKINTIFIC 3X ACID INTENSIVE ACNE SERUM", category: "SERUM", qty: 22, sell_out_value: 1677060 },
+    { item_id: "SKINTIFIC-122", sku: "SKINTIFIC AQUA LIGHT DAILY SUNSCREEN", category: "SUNSCREEN", qty: 16, sell_out_value: 973280 },
+    { item_id: "SKINTIFIC-123", sku: "SKINTIFIC BRIGHTENING LIP SERUM 01", category: "TREATMENT", qty: 34, sell_out_value: 2876910 },
+    { item_id: "SKINTIFIC-1234", sku: "SKINTIFIC BRIGHTENING LIP SERUM 02", category: "TREATMENT", qty: 28, sell_out_value: 2500960 },
+    { item_id: "SKINTIFIC-1235", sku: "SKINTIFIC BRIGHTENING LIP SERUM 03", category: "TREATMENT", qty: 12, sell_out_value: 1071840 },
+    { item_id: "SKINTIFIC-1236", sku: "SKINTIFIC BRIGHTENING LIP SERUM 04", category: "TREATMENT", qty: 22, sell_out_value: 1965040 },
+    { item_id: "SKINTIFIC-128", sku: "SKINTIFIC 5% Panthenol Acne Calming Water Gel", category: "MOISTURIZER", qty: 12, sell_out_value: 2023560 },
+    { item_id: "SKINTIFIC-129", sku: "SKINTIFIC 3X ACID ACNE GEL CLEANSER", category: "CLEANSER", qty: 79, sell_out_value: 6022170 },
+    { item_id: "SKINTIFIC-13", sku: "SKINTIFIC 5X CERAMIDE BARRIER SERUM", category: "SERUM", qty: 53, sell_out_value: 5264490 },
+    { item_id: "SKINTIFIC-1340", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 01", category: "DECORATIVE", qty: 3, sell_out_value: 390390 },
+    { item_id: "SKINTIFIC-1341", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 02", category: "DECORATIVE", qty: 14, sell_out_value: 1821820 },
+    { item_id: "SKINTIFIC-1342", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 03", category: "DECORATIVE", qty: 41, sell_out_value: 5335330 },
+    { item_id: "SKINTIFIC-1343", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 04", category: "DECORATIVE", qty: 43, sell_out_value: 5595590 },
+    { item_id: "SKINTIFIC-1343A", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 05", category: "DECORATIVE", qty: 19, sell_out_value: 2472470 },
+    { item_id: "SKINTIFIC-1344", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 06", category: "DECORATIVE", qty: 9, sell_out_value: 1171170 },
+    { item_id: "SKINTIFIC-1345", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 07", category: "DECORATIVE", qty: 7, sell_out_value: 910910 },
+    { item_id: "SKINTIFIC-1346", sku: "SKINTIFIC PERFECT STAY VELVET MATTE CUSHION 08", category: "DECORATIVE", qty: 5, sell_out_value: 650650 }
+  ];
+
+  const months = ["Apr-26", "May-26", "Jun-26"];
+  const data: CategoryAnalysisData[] = [];
+
+  months.forEach((month, mIdx) => {
+    // We can multiply quantities and sell out values slightly based on the month to have varied trends
+    const monthMultiplier = 1 + (mIdx * 0.15);
+
+    regions.forEach((region, rIdx) => {
+      // Vary slightly per region as well
+      const regionMultiplier = 1 + (rIdx * 0.1) - (rIdx === 3 ? 0.35 : 0);
+
+      baseItems.forEach((item) => {
+        const total_quantity = Math.round(item.qty * monthMultiplier * regionMultiplier);
+        
+        // Calculate dynamic sell out value based on quantity to keep logic realistic
+        // item.sell_out_value / item.qty is the unit price
+        const unitPrice = item.qty > 0 ? item.sell_out_value / item.qty : 95000;
+        const sell_out_value = Math.round(total_quantity * unitPrice);
+
+        // For Sell Through, let's make it some realistic percentage of Sell Out (e.g., 70% to 95%)
+        // or 0 for Sell Out rows if they are purely Sell Out, but let's make it beautiful and varied
+        const sell_through_value = Math.round(sell_out_value * (0.7 + (Math.random() * 0.2)));
+
+        data.push({
+          source_of: "SELL OUT",
+          month: month,
+          region: region.name,
+          distributor_name: region.distributor,
+          item_id: item.item_id,
+          sku: item.sku,
+          total_quantity: total_quantity,
+          sell_through_value: sell_through_value,
+          sell_out_value: sell_out_value,
+          category: item.category,
+          _isFallback: true
+        });
+      });
+    });
+  });
+
+  return data;
+}
+
+export const STOCK_ANALYSIS_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_STOCK_ANALYSIS_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbxnVHv-7mO5COA-PFSRn41MwRsODjJdb1v5xIrbROWPyXL9ZNeht_PYrx1CEHezA30m/exec";
+
+let cachedStockAnalysisData: StockAnalysisData[] | null = null;
+let lastStockAnalysisFetchTime = 0;
+
+export async function fetchStockAnalysisData(forceRefresh = false): Promise<StockAnalysisData[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedStockAnalysisData && (now - lastStockAnalysisFetchTime < CACHE_DURATION)) {
+    console.log("Returning cached Stock Analysis data");
+    return cachedStockAnalysisData;
+  }
+
+  let rawData: any = null;
+  let lastErrorMessage = "";
+
+  // 1. First attempt: fetch via local Node proxy route
+  try {
+    const response = await fetch(`/api/stock-analysis`);
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success !== false) {
+        rawData = json;
+      } else {
+        lastErrorMessage = json?.message || "GAS proxy returned success: false or invalid response.";
+        console.warn("GAS proxy returned success: false or invalid response for Stock Analysis:", lastErrorMessage);
+      }
+    } else {
+      lastErrorMessage = `Local proxy returned status ${response.status}`;
+      console.warn(`Local proxy returned status ${response.status} for Stock Analysis. Trying direct browser fetch.`);
+    }
+  } catch (proxyError: any) {
+    lastErrorMessage = proxyError?.message || String(proxyError);
+    console.warn("Proxy fetch nested error for Stock Analysis:", proxyError);
+  }
+
+  // 2. Second attempt: fallback to direct GAS browser fetch
+  const scriptUrl = STOCK_ANALYSIS_SCRIPT_URL;
+  if (!rawData && scriptUrl && scriptUrl.startsWith("https://") && !scriptUrl.includes("placeholder")) {
+    try {
+      console.log("Attempting direct browser fetch for Stock Analysis from:", scriptUrl);
+      const response = await fetch(scriptUrl);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for Stock Analysis succeeded!");
+      } else {
+        lastErrorMessage = `Direct fetch returned status: ${response.status}`;
+        throw new Error(lastErrorMessage);
+      }
+    } catch (directError: any) {
+      lastErrorMessage = directError?.message || String(directError);
+      console.error("Direct browser fetch for Stock Analysis failed:", directError);
+    }
+  }
+
+  // 3. Map retrieved JSON payload
+  if (rawData) {
+    try {
+      const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
+
+      let arrayData: any[] = [];
+      if (Array.isArray(payloadObj)) {
+        arrayData = payloadObj;
+      } else if (payloadObj && typeof payloadObj === "object") {
+        if (Array.isArray(payloadObj.data)) {
+          arrayData = payloadObj.data;
+        } else if (Array.isArray(payloadObj.rows)) {
+          arrayData = payloadObj.rows;
+        } else if (Array.isArray(payloadObj.records)) {
+          arrayData = payloadObj.records;
+        } else {
+          const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
+          if (possibleArray) {
+            arrayData = possibleArray;
+          } else {
+            console.error("No recognizable array found in Google Apps Script response for Stock Analysis");
+          }
+        }
+      }
+
+      if (arrayData.length > 0) {
+        console.log("Fetched Stock Analysis records:", arrayData.length);
+
+        const mappedData = arrayData.map((item: any) => {
+          const itemNormalized: Record<string, any> = {};
+          for (const k of Object.keys(item)) {
+            const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            itemNormalized[cleanK] = item[k];
+          }
+
+          const findString = (exactAndAliases: string[], defaultValue = ""): string => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                return String(itemNormalized[cleanK]).trim() || defaultValue;
+              }
+            }
+            return defaultValue;
+          };
+
+          const findNumber = (exactAndAliases: string[], defaultValue = 0): number => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                const num = parseFloat(String(itemNormalized[cleanK]).replace(/[^0-9\.\-]/g, ""));
+                return isNaN(num) ? defaultValue : num;
+              }
+            }
+            return defaultValue;
+          };
+
+          return {
+            update_date: findString(["updatedate", "update_date", "tanggal", "date"]),
+            distributor: findString(["distributor", "distributor_name", "distributorname"]),
+            product_code: findString(["productcode", "product_code", "productid", "itemid", "item_id"]),
+            item_id: findString(["itemid", "item_id", "productcode", "product_code"]),
+            sku: findString(["sku", "skuname", "sku_name", "nama_barang", "product"]),
+            soh_qty: findNumber(["sohqty", "soh_qty", "soh", "stock_on_hand"]),
+            in_transit_stock_qty: findNumber(["intransitstockqty", "in_transit_stock_qty", "intransit", "in_transit_qty"]),
+            total_transit: findNumber(["totaltransit", "total_transit", "transit_total"]),
+            avg_am_l3m_qty: findNumber(["avgaml3mqty", "avg_am_l3m_qty", "avg_am"]),
+            last_month_st_qty: findNumber(["lastmonthstqty", "last_month_st_qty", "last_month_st"]),
+            brand: findString(["brand", "brand_of", "brandname"]),
+            avg_st_l3m: findNumber(["avgstl3m", "avg_st_l3m", "avg_st"]),
+            stock_total: findNumber(["stocktotal", "stock_total", "total_stock"]),
+            woi_st_l3m: findNumber(["woistl3m", "woi_st_l3m", "woi"]),
+            death_stock_flag: findString(["deathstockflag", "death_stock_flag", "deadstock"]),
+            remarks_woi: findString(["remarkswoi", "remarks_woi", "remarks"]),
+            po_remarks: findString(["poremarks", "po_remarks", "po_remark"])
+          };
+        });
+
+        cachedStockAnalysisData = mappedData;
+        lastStockAnalysisFetchTime = now;
+        return mappedData;
+      }
+    } catch (parseErr: any) {
+      console.error("Failed to parse retrieved Stock Analysis data, falling back to mock:", parseErr);
+      if (forceRefresh) {
+        throw new Error(`Data parsing error: ${parseErr?.message || parseErr}`);
+      }
+    }
+  }
+
+  if (forceRefresh) {
+    throw new Error(lastErrorMessage || "Failed to sync spreadsheet. Connection failed or Google Apps Script returned invalid response.");
+  }
+
+  // Fallback to High-Fidelity Mock
+  console.log("Using High-Fidelity local mock Stock Analysis data");
+  const mockData = generateMockStockAnalysisData();
+  cachedStockAnalysisData = mockData;
+  lastStockAnalysisFetchTime = now;
+  return mockData;
+}
+
+export function generateMockStockAnalysisData(): StockAnalysisData[] {
+  return [
+    {
+      update_date: "7/8/2026",
+      distributor: "CV BUANA DISTRIBUSINDO UTAMA",
+      product_code: "FJM020001",
+      item_id: "FJM020001",
+      sku: "FACERINNA 2% NIACINAMIDE POWER BRIGHT CLEANSER",
+      soh_qty: 436,
+      in_transit_stock_qty: 288,
+      total_transit: 288,
+      avg_am_l3m_qty: 6,
+      last_month_st_qty: 283,
+      brand: "FACERINNA",
+      avg_st_l3m: 207,
+      stock_total: 724,
+      woi_st_l3m: 15,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/8/2026",
+      distributor: "CV BUANA DISTRIBUSINDO UTAMA",
+      product_code: "FFC001001",
+      item_id: "FFC001001",
+      sku: "FACERINNA NIACINAMIDE BRIGHTENING SERUM SUNSCREEN SPF 50 PA++++ 50ML",
+      soh_qty: 295,
+      in_transit_stock_qty: 480,
+      total_transit: 480,
+      avg_am_l3m_qty: 12,
+      last_month_st_qty: 621,
+      brand: "FACERINNA",
+      avg_st_l3m: 636,
+      stock_total: 775,
+      woi_st_l3m: 5,
+      death_stock_flag: "",
+      remarks_woi: "OOS Risk",
+      po_remarks: "Available for PO"
+    },
+    {
+      update_date: "7/8/2026",
+      distributor: "CV BUANA DISTRIBUSINDO UTAMA",
+      product_code: "FJM020002",
+      item_id: "FJM020002",
+      sku: "FACERINNA 2% NIACINAMIDE POWER BRIGHT CLEANSER",
+      soh_qty: 2,
+      in_transit_stock_qty: 768,
+      total_transit: 768,
+      avg_am_l3m_qty: 7,
+      last_month_st_qty: 102,
+      brand: "FACERINNA",
+      avg_st_l3m: 102,
+      stock_total: 770,
+      woi_st_l3m: 33,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/8/2026",
+      distributor: "CV BUANA DISTRIBUSINDO UTAMA",
+      product_code: "FJH018001",
+      item_id: "FJH018001",
+      sku: "FACERINNA 10% NIACINAMIDE 3% TXA BRIGHT DARK SPOT SERUM",
+      soh_qty: 474,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 7,
+      last_month_st_qty: 211,
+      brand: "FACERINNA",
+      avg_st_l3m: 179,
+      stock_total: 474,
+      woi_st_l3m: 11,
+      death_stock_flag: "",
+      remarks_woi: "OOS Risk",
+      po_remarks: "Available for PO"
+    },
+    {
+      update_date: "7/8/2026",
+      distributor: "CV BUANA DISTRIBUSINDO UTAMA",
+      product_code: "FJM005002",
+      item_id: "FJM005002",
+      sku: "FACERINNA SALICYLIC ACID ACNE GEL CLEANSER",
+      soh_qty: 469,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 6,
+      last_month_st_qty: 124,
+      brand: "FACERINNA",
+      avg_st_l3m: 119,
+      stock_total: 469,
+      woi_st_l3m: 17,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - BALI",
+      product_code: "FMS004001",
+      item_id: "FMS004001",
+      sku: "FACERINNA CERAMIDE B5 BALANCING MOISTURIZER",
+      soh_qty: 172,
+      in_transit_stock_qty: 24,
+      total_transit: 24,
+      avg_am_l3m_qty: 8,
+      last_month_st_qty: 90,
+      brand: "FACERINNA",
+      avg_st_l3m: 83,
+      stock_total: 196,
+      woi_st_l3m: 10,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - TARA",
+      product_code: "FJM002003",
+      item_id: "FJM002003",
+      sku: "FACERINNA LOW PH B5 GEL CLEANSER",
+      soh_qty: 11,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 7,
+      last_month_st_qty: 0,
+      brand: "FACERINNA",
+      avg_st_l3m: 14,
+      stock_total: 11,
+      woi_st_l3m: 4,
+      death_stock_flag: "",
+      remarks_woi: "OOS Risk",
+      po_remarks: "Available for PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - TARA",
+      product_code: "FJM002002",
+      item_id: "FJM002002",
+      sku: "FACERINNA LOW PH B5 GEL CLEANSER",
+      soh_qty: 389,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 6,
+      last_month_st_qty: 22,
+      brand: "FACERINNA",
+      avg_st_l3m: 37,
+      stock_total: 389,
+      woi_st_l3m: 46,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - BERA",
+      product_code: "FMS013001",
+      item_id: "FMS013001",
+      sku: "FACERINNA 5% NIACINAMIDE 1% TXA BRIGHT DARK SPOT MOISTURIZER",
+      soh_qty: 47,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 10,
+      last_month_st_qty: 8,
+      brand: "FACERINNA",
+      avg_st_l3m: 14,
+      stock_total: 47,
+      woi_st_l3m: 14,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - GROI",
+      product_code: "FJM002002",
+      item_id: "FJM002002",
+      sku: "FACERINNA LOW PH B5 GEL CLEANSER",
+      soh_qty: 21,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 4,
+      last_month_st_qty: 18,
+      brand: "FACERINNA",
+      avg_st_l3m: 12,
+      stock_total: 21,
+      woi_st_l3m: 8,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - BANJ",
+      product_code: "FFC001001",
+      item_id: "FFC001001",
+      sku: "FACERINNA NIACINAMIDE BRIGHTENING SERUM SUNSCREEN SPF 50 PA++++ 50ML",
+      soh_qty: 1226,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 9,
+      last_month_st_qty: 196,
+      brand: "FACERINNA",
+      avg_st_l3m: 116,
+      stock_total: 1226,
+      woi_st_l3m: 46,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - BANJ",
+      product_code: "FJH018001",
+      item_id: "FJH018001",
+      sku: "FACERINNA 10% NIACINAMIDE 3% TXA BRIGHT DARK SPOT SERUM",
+      soh_qty: 296,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 10,
+      last_month_st_qty: 75,
+      brand: "FACERINNA",
+      avg_st_l3m: 38,
+      stock_total: 296,
+      woi_st_l3m: 33,
+      death_stock_flag: "",
+      remarks_woi: "High WOI",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - GORON",
+      product_code: "FMS112001",
+      item_id: "FMS112001",
+      sku: "FACERINNA 5% B5 NIACINAMIDE BRIGHT BARRIER CREAM",
+      soh_qty: 23,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 1,
+      last_month_st_qty: 11,
+      brand: "FACERINNA",
+      avg_st_l3m: 0,
+      stock_total: 23,
+      woi_st_l3m: 0,
+      death_stock_flag: "Dead Stock",
+      remarks_woi: "-",
+      po_remarks: "Stop PO"
+    },
+    {
+      update_date: "7/13/2026",
+      distributor: "PT TRIJAYA ADHIRAJA ABADI - BERA",
+      product_code: "FMS112001",
+      item_id: "FMS112001",
+      sku: "FACERINNA 5% B5 NIACINAMIDE BRIGHT BARRIER CREAM",
+      soh_qty: 60,
+      in_transit_stock_qty: 0,
+      total_transit: 0,
+      avg_am_l3m_qty: 28,
+      last_month_st_qty: 72,
+      brand: "FACERINNA",
+      avg_st_l3m: 0,
+      stock_total: 60,
+      woi_st_l3m: 0,
+      death_stock_flag: "Dead Stock",
+      remarks_woi: "-",
+      po_remarks: "Stop PO"
+    }
+  ];
 }

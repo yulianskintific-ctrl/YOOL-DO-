@@ -22,6 +22,8 @@ import SellOutDashboard from "./components/SellOutDashboard";
 import { SKUList } from "./components/SKUList";
 import SKUFocusPage from "./components/SKUFocusPage";
 import IncentivesLeftBehind from "./components/IncentivesLeftBehind";
+import CategoryAnalysisPage from "./components/CategoryAnalysisPage";
+import StockAnalysisPage from "./components/StockAnalysisPage";
 
 export default function App() {
   const [data, setData] = useState<SalesData[]>([]);
@@ -478,29 +480,6 @@ export default function App() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-white text-blue-600 gap-4">
-        <Loader2 className="animate-spin w-10 h-10" />
-        <div className="text-center">
-          <span className="font-black tracking-[0.3em] text-xs uppercase block mb-1">YOOL-DO! SYSTEMS</span>
-          <span className="text-[10px] font-bold text-slate-400 uppercase animate-pulse">{loadingStatus}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-white p-6 text-center">
-        <X className="text-rose-500 mb-4" size={40} />
-        <h2 className="text-xl font-black text-slate-900 mb-2">Sync Connection Failure</h2>
-        <p className="text-slate-500 text-sm max-w-md mb-8">{error}</p>
-        <button onClick={() => handleSync(true)} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-blue-700 transition-all">Retry Connection</button>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white min-h-screen text-slate-900 font-sans">
       <Sidebar 
@@ -511,10 +490,29 @@ export default function App() {
       />
       
       <main className={cn("transition-all duration-500 p-8 max-w-[1500px] mx-auto", isSidebarCollapsed ? "pl-28" : "pl-72")}>
-        {activeMenu === 'Product Catalog' ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32 text-blue-600 gap-4">
+            <Loader2 className="animate-spin w-10 h-10" />
+            <div className="text-center">
+              <span className="font-black tracking-[0.3em] text-xs uppercase block mb-1">YOOL-DO! SYSTEMS</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase animate-pulse">{loadingStatus}</span>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-24 p-6 text-center">
+            <X className="text-rose-500 mb-4" size={40} />
+            <h2 className="text-xl font-black text-slate-900 mb-2">Sync Connection Failure</h2>
+            <p className="text-slate-500 text-sm max-w-md mb-8">{error}</p>
+            <button onClick={() => handleSync(true)} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-xl hover:bg-blue-700 transition-all">Retry Connection</button>
+          </div>
+        ) : activeMenu === 'Product Catalog' ? (
           <SKUList />
         ) : activeMenu === 'SKU Focus' ? (
           <SKUFocusPage />
+        ) : activeMenu === 'Category Analysis' ? (
+          <CategoryAnalysisPage />
+        ) : activeMenu === 'Stock Analysis' ? (
+          <StockAnalysisPage />
         ) : activeMenu === 'Incentives Pertinggal' ? (
           <div className="space-y-6">
             <header className="mb-10 pb-8 border-b border-slate-50">

@@ -32,6 +32,8 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
     const sellIn = SIDEBAR_ITEMS.find(i => i.name === 'Sell In');
     const sellThrough = SIDEBAR_ITEMS.find(i => i.name === 'Sell Through');
     const sellOut = SIDEBAR_ITEMS.find(i => i.name === 'Sell Out');
+    const categoryAnalysis = SIDEBAR_ITEMS.find(i => i.name === 'Category Analysis');
+    const stockAnalysis = SIDEBAR_ITEMS.find(i => i.name === 'Stock Analysis');
     const spvInternal = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Internal');
     const spvExclusive = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Exclusive');
     const seIncentives = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SE');
@@ -45,6 +47,8 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
       sellIn && { type: 'item' as const, item: sellIn },
       sellThrough && { type: 'item' as const, item: sellThrough },
       sellOut && { type: 'item' as const, item: sellOut },
+      categoryAnalysis && { type: 'item' as const, item: categoryAnalysis },
+      stockAnalysis && { type: 'item' as const, item: stockAnalysis },
       (spvInternal || spvExclusive || seIncentives || incentivesLeftBehind) && {
         type: 'group' as const,
         name: 'Incentives',

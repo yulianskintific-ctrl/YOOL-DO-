@@ -7,41 +7,106 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Simple in-memory cache for Google Apps Script proxy requests to handle timeouts/failures gracefully
+const proxyCache: Record<string, any> = {};
+
+// Helper function to fetch with timeout to prevent undici headers timeout errors
+async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 45000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error: any) {
+    clearTimeout(id);
+    if (error.name === "AbortError" || error.message?.includes("aborted")) {
+      throw new Error(`Request to Google Apps Script timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
+// Upgraded helper function to fetch with auto-retries for resiliency
+async function fetchWithRetry(url: string, options: any = {}, retries = 1, timeoutMs = 45000): Promise<Response> {
+  let lastError: any = null;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      if (i > 0) {
+        console.log(`[Proxy] Retry attempt ${i} for ${url} after previous failure`);
+        // wait 500ms before retrying
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      return await fetchWithTimeout(url, options, timeoutMs);
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Proxy Warning] Attempt ${i + 1} failed for ${url}: ${err.message || err}`);
+    }
+  }
+  throw lastError || new Error(`Failed after ${retries + 1} attempts`);
+}
+
 // API route to proxy Sales Data (Sell In and Sell Through)
 app.get("/api/sales-data", async (req, res) => {
+  const sheet = req.query.sheet ? String(req.query.sheet) : "Sell In and Through";
+  const cacheKey = `sales-data-${sheet}`;
   try {
-    const sheet = req.query.sheet ? String(req.query.sheet) : "Sell In and Through";
     const SCRIPT_URL = process.env.SALES_DATA_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbyA83M4VP5R3A0vKEUjwh--HOcOjDwnH7b9CVZVsGd4P_RHGqhLhoJvJNsQm9VVkKIIHA/exec";
     const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheet)}`;
     console.log(`[Proxy] Fetching sales data from GAS: ${targetUrl}`);
     
-    const response = await fetch(targetUrl);
+    const response = await fetchWithRetry(targetUrl, {}, 1, 45000);
     if (!response.ok) {
       throw new Error(`Google Apps Script responder returned status: ${response.status}`);
     }
     const data = await response.json();
+    
+    // Save to cache
+    proxyCache[cacheKey] = data;
+    
     res.json(data);
   } catch (err: any) {
-    console.error("[Proxy Error] sales data fetch failure:", err);
-    res.status(500).json({ error: err.message || "Failed to fetch sales data from script" });
+    console.warn("[Proxy Warning] sales data fetch failure:", err);
+    
+    // Check if we have cached data
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json(proxyCache[cacheKey]);
+    }
+    
+    // Return an empty array so client doesn't crash
+    res.json([]);
   }
 });
 
 // API route to proxy SPV Internal Incentive Records
 app.get("/api/incentives-internal", async (req, res) => {
+  const cacheKey = "incentives-internal";
   try {
-    const INCENTIVES_SCRIPT_URL = process.env.INCENTIVES_INTERNAL_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbzH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec";
+    const INCENTIVES_SCRIPT_URL = process.env.INCENTIVES_INTERNAL_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec";
     console.log("[Proxy] Fetching internal incentives from GAS");
     
-    const response = await fetch(INCENTIVES_SCRIPT_URL);
+    const response = await fetchWithRetry(INCENTIVES_SCRIPT_URL, {}, 1, 45000);
     if (!response.ok) {
       throw new Error(`Google Apps Script responder returned status: ${response.status}`);
     }
     const data = await response.json();
+    
+    proxyCache[cacheKey] = data;
+    
     res.json(data);
   } catch (err: any) {
-    console.error("[Proxy Error] internal incentives fetch failure:", err);
-    res.status(500).json({ error: err.message || "Failed to fetch internal incentives data from script" });
+    console.warn("[Proxy Warning] internal incentives fetch failure:", err);
+    
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json(proxyCache[cacheKey]);
+    }
+    
+    res.json([]);
   }
 });
 
@@ -51,7 +116,7 @@ app.get("/api/incentives-exclusive", async (req, res) => {
     const EXCLUSIVE_SCRIPT_URL = process.env.INCENTIVES_EXCLUSIVE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbx8W37XlWx_71xdS_-f8JML7HHoDx7iaGxcSxdkYVeSv73o1sQ46AF8lr2i0M6wtE23jw/exec";
     console.log("[Proxy] Fetching exclusive incentives from GAS");
     
-    const response = await fetch(EXCLUSIVE_SCRIPT_URL);
+    const response = await fetchWithTimeout(EXCLUSIVE_SCRIPT_URL);
     
     // Check for 403 Forbidden directly
     if (response.status === 403) {
@@ -89,7 +154,7 @@ app.get("/api/incentives-se", async (req, res) => {
     const SE_SCRIPT_URL = process.env.INCENTIVES_SE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
     console.log("[Proxy] Fetching SE incentives from GAS");
 
-    const response = await fetch(SE_SCRIPT_URL);
+    const response = await fetchWithTimeout(SE_SCRIPT_URL);
     
     // Check for 403 Forbidden
     if (response.status === 403) {
@@ -130,7 +195,7 @@ app.get("/api/sell-out", async (req, res) => {
     }
     console.log(`[Proxy] Fetching Sell Out data from GAS: ${SELL_OUT_SCRIPT_URL}`);
 
-    const response = await fetch(SELL_OUT_SCRIPT_URL);
+    const response = await fetchWithTimeout(SELL_OUT_SCRIPT_URL);
     
     // Check for 403 Forbidden
     if (response.status === 403) {
@@ -167,6 +232,176 @@ app.get("/api/sell-out", async (req, res) => {
   }
 });
 
+// API route to proxy Category Analysis records
+app.get("/api/category-analysis", async (req, res) => {
+  const cacheKey = "category-analysis";
+  try {
+    const CATEGORY_ANALYSIS_SCRIPT_URL = process.env.CATEGORY_ANALYSIS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbykWuGTeAZCcPzWXSUYY53nLFcLcRnaPkZI3efxus-oWz5b4NuFI5EUyz854TwGkQzr/exec";
+    if (!CATEGORY_ANALYSIS_SCRIPT_URL || CATEGORY_ANALYSIS_SCRIPT_URL.includes("placeholder") || CATEGORY_ANALYSIS_SCRIPT_URL.includes("Placeholder") || !CATEGORY_ANALYSIS_SCRIPT_URL.startsWith("https://")) {
+      return res.json({
+        success: false,
+        isDemo: true,
+        message: "Category Analysis script URL is not configured. Using demo mode.",
+        data: []
+      });
+    }
+
+    console.log(`[Proxy] Fetching Category Analysis data from GAS: ${CATEGORY_ANALYSIS_SCRIPT_URL}`);
+    const response = await fetchWithRetry(CATEGORY_ANALYSIS_SCRIPT_URL, {}, 1, 45000);
+    
+    // Check for 403 Forbidden
+    if (response.status === 403) {
+      console.warn("[Proxy Warning] Category Analysis Google Apps Script returned status 403 (Forbidden).");
+      return res.json({
+        success: false,
+        errorType: "403_FORBIDDEN",
+        message: "Google Apps Script returned status 403. Please deploy with 'Who has access: Anyone' and 'Execute as: Me'.",
+        data: []
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Google Apps Script responder returned status: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    
+    // Check if the response is actually HTML (Google login redirect or permission screen)
+    if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html") || responseText.trim().startsWith("<")) {
+      console.warn("[Proxy Warning] Category Analysis Google Apps Script returned HTML instead of JSON. Likely permissions are not set to 'Anyone'.");
+      return res.json({
+        success: false,
+        errorType: "HTML_RESPONSE_EXCLUSION",
+        message: "Google Apps Script returned HTML (access restricted). Please redeploy the script set to: Execute as: 'Me' and Who has access: 'Anyone'.",
+        data: []
+      });
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.warn("[Proxy Warning] Failed to parse Category Analysis JSON response:", parseErr);
+      return res.json({
+        success: false,
+        errorType: "INVALID_JSON",
+        message: "Google Apps Script returned invalid JSON format. Please ensure your script returns JSON ContentService correctly.",
+        data: []
+      });
+    }
+
+    // Cache the successful data
+    proxyCache[cacheKey] = data;
+
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (err: any) {
+    console.warn("[Proxy Warning] Category Analysis fetch failure:", err);
+    
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json({
+        success: true,
+        data: proxyCache[cacheKey]
+      });
+    }
+
+    res.json({
+      success: false,
+      errorType: "FETCH_FAILURE",
+      message: err.message || "Failed to fetch Category Analysis data from script",
+      data: []
+    });
+  }
+});
+
+// API route to proxy Stock Analysis records
+app.get("/api/stock-analysis", async (req, res) => {
+  const cacheKey = "stock-analysis";
+  try {
+    const STOCK_ANALYSIS_SCRIPT_URL = process.env.STOCK_ANALYSIS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxnVHv-7mO5COA-PFSRn41MwRsODjJdb1v5xIrbROWPyXL9ZNeht_PYrx1CEHezA30m/exec";
+    if (!STOCK_ANALYSIS_SCRIPT_URL || !STOCK_ANALYSIS_SCRIPT_URL.startsWith("https://")) {
+      return res.json({
+        success: false,
+        isDemo: true,
+        message: "Stock Analysis script URL is not configured. Using demo mode.",
+        data: []
+      });
+    }
+
+    console.log(`[Proxy] Fetching Stock Analysis data from GAS: ${STOCK_ANALYSIS_SCRIPT_URL}`);
+    const response = await fetchWithRetry(STOCK_ANALYSIS_SCRIPT_URL, {}, 1, 45000);
+    
+    // Check for 403 Forbidden
+    if (response.status === 403) {
+      console.warn("[Proxy Warning] Stock Analysis Google Apps Script returned status 403 (Forbidden).");
+      return res.json({
+        success: false,
+        errorType: "403_FORBIDDEN",
+        message: "Google Apps Script returned status 403. Please deploy with 'Who has access: Anyone' and 'Execute as: Me'.",
+        data: []
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Google Apps Script responder returned status: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    
+    // Check if the response is actually HTML (Google login redirect or permission screen)
+    if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html") || responseText.trim().startsWith("<")) {
+      console.warn("[Proxy Warning] Stock Analysis Google Apps Script returned HTML instead of JSON. Likely permissions are not set to 'Anyone'.");
+      return res.json({
+        success: false,
+        errorType: "HTML_RESPONSE_EXCLUSION",
+        message: "Google Apps Script returned HTML (access restricted). Please redeploy the script set to: Execute as: 'Me' and Who has access: 'Anyone'.",
+        data: []
+      });
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.warn("[Proxy Warning] Failed to parse Stock Analysis JSON response:", parseErr);
+      return res.json({
+        success: false,
+        errorType: "INVALID_JSON",
+        message: "Google Apps Script returned invalid JSON format. Please ensure your script returns JSON ContentService correctly.",
+        data: []
+      });
+    }
+
+    // Cache the successful data
+    proxyCache[cacheKey] = data;
+
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (err: any) {
+    console.warn("[Proxy Warning] Stock Analysis fetch failure:", err);
+    
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json({
+        success: true,
+        data: proxyCache[cacheKey]
+      });
+    }
+
+    res.json({
+      success: false,
+      errorType: "FETCH_FAILURE",
+      message: err.message || "Failed to fetch Stock Analysis data from script",
+      data: []
+    });
+  }
+});
+
 // API route to proxy SKU Focus records (modular & separate)
 app.get("/api/sku-focus", async (req, res) => {
   try {
@@ -194,7 +429,7 @@ app.get("/api/sku-focus", async (req, res) => {
     const targetUrl = `${SKU_FOCUS_SCRIPT_URL}?sheet=${encodeURIComponent(sheetName)}`;
     console.log(`[Proxy] Fetching SKU Focus (${sheetName}) data from GAS: ${targetUrl}`);
 
-    const response = await fetch(targetUrl);
+    const response = await fetchWithTimeout(targetUrl);
     
     // Check for 403 Forbidden
     if (response.status === 403) {
@@ -246,7 +481,7 @@ app.get("/api/product-catalog", async (req, res) => {
     }
 
     // Set standard browser headers to prevent Google's macro servers from throwing 403 Forbidden errors
-    const response = await fetch(targetUrl, {
+    const response = await fetchWithTimeout(targetUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
@@ -317,7 +552,7 @@ app.get("/api/product-catalog", async (req, res) => {
         const data = JSON.parse(text);
         res.json({ success: true, format: "gas", data: data });
       } catch (parseError: any) {
-        console.error("[Proxy parseError] Raw body:", text.substring(0, 300));
+        console.warn("[Proxy parseWarning] Raw body:", text.substring(0, 300));
         return res.status(200).json({
           success: false,
           error: `Gagal membaca format JSON dari Apps Script. Pesan: ${parseError.message || ""}. Pastikan spreadsheet Anda mengembalikan JSON yang valid.`
@@ -325,7 +560,7 @@ app.get("/api/product-catalog", async (req, res) => {
       }
     }
   } catch (err: any) {
-    console.error("[Proxy Error] Product catalog fetch failure:", err);
+    console.warn("[Proxy Warning] Product catalog fetch failure:", err);
     res.status(500).json({ success: false, error: err.message || "Failed to fetch product catalog data" });
   }
 });

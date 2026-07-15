@@ -15,13 +15,17 @@ import {
   Truck,
   Package,
   Target,
-  ExternalLink
+  ExternalLink,
+  PieChart,
+  Boxes
 } from "lucide-react";
 
 export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolean }[] = [
   { name: 'Sell In', icon: BarChart3, isComingSoon: false },
   { name: 'Sell Through', icon: TrendingUp, isComingSoon: false },
   { name: 'Sell Out', icon: ShoppingBag, isComingSoon: false },
+  { name: 'Category Analysis', icon: PieChart, isComingSoon: false },
+  { name: 'Stock Analysis', icon: Boxes, isComingSoon: false },
   { name: 'Incentives SPV Internal', icon: Coins, isComingSoon: false },
   { name: 'Incentives SPV Exclusive', icon: Crown, isComingSoon: false },
   { name: 'Incentives SE', icon: UserCheck, isComingSoon: false },
