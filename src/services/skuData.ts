@@ -14,6 +14,7 @@ export interface SKUData {
   subsegment: string; // e.g., "Toner", "Serum", "Face Cream", "Eye Cream", "Sunscreen Cream", "Lip Serum", "Cushion Compact", "Pressed Powder", "Cleanser", "Applied Masks"
   priceSIP: number;   // Price For Distri
   priceSTP: number;   // Price For Store
+  priceSRP?: number;  // Price For Retail (SRP)
 }
 
 export const SKU_DATABASE: SKUData[] = [
@@ -402,3 +403,11 @@ export const SKU_DATABASE: SKUData[] = [
     priceSTP: 29700
   }
 ];
+
+// Dynamically enrich mock database with standard SRP (Harga Eceran Tertinggi) if not specified
+SKU_DATABASE.forEach(item => {
+  if (item.priceSRP === undefined || item.priceSRP === 0) {
+    // Standard retail markup from store price is 15-20%, let's use 1.20 and round to nearest 100 Rp
+    item.priceSRP = Math.round((item.priceSTP * 1.20) / 100) * 100;
+  }
+});

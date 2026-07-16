@@ -46,6 +46,32 @@ export function normalizeBrand(brandStr: string | undefined | null): string {
     .join(" ");
 }
 
+export function parseIndonesianPrice(val: any): number {
+  if (val === undefined || val === null) return 0;
+  if (typeof val === "number") return val;
+  const str = String(val).trim();
+  if (!str) return 0;
+
+  let cleaned = str.replace(/[Rr]p|\s/g, "");
+  if (cleaned.includes(",") && cleaned.includes(".")) {
+    cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+  } else if (cleaned.includes(",")) {
+    const parts = cleaned.split(",");
+    if (parts[1] && parts[1].length === 2) {
+      cleaned = cleaned.replace(/,/g, ".");
+    } else {
+      cleaned = cleaned.replace(/,/g, "");
+    }
+  } else if (cleaned.includes(".")) {
+    const parts = cleaned.split(".");
+    if (parts[parts.length - 1].length === 3) {
+      cleaned = cleaned.replace(/\./g, "");
+    }
+  }
+  cleaned = cleaned.replace(/[^0-9.-]/g, "");
+  return Number(cleaned) || 0;
+}
+
 // Robust Fuzzy Mapping Engine to translate any Google Spreadsheet / Apps Script headers back to standard catalog fields
 function mapFuzzyItem(item: any): SKUData {
   if (!item) return {
@@ -58,7 +84,8 @@ function mapFuzzyItem(item: any): SKUData {
     segment: "Face",
     subsegment: "Serum",
     priceSIP: 0,
-    priceSTP: 0
+    priceSTP: 0,
+    priceSRP: 0
   };
 
   const keys = Object.keys(item);
@@ -72,6 +99,7 @@ function mapFuzzyItem(item: any): SKUData {
   let subsegment = "Serum";
   let priceSIP = 0;
   let priceSTP = 0;
+  let priceSRP = 0;
 
   for (const rawKey of keys) {
     const key = rawKey.toLowerCase().replace(/[\s_-]+/g, "");
@@ -119,18 +147,23 @@ function mapFuzzyItem(item: any): SKUData {
       key.includes("hargasip") || 
       key.includes("distrib")
     ) {
-      const cleaned = String(val).replace(/[^0-9.-]+/g, "");
-      priceSIP = Number(cleaned) || 0;
+      priceSIP = parseIndonesianPrice(val);
     } else if (
       key.includes("pricestp") || 
       key.includes("stp") || 
       key.includes("store") || 
       key.includes("hargastp") || 
-      key.includes("retail") || 
       key.includes("toko")
     ) {
-      const cleaned = String(val).replace(/[^0-9.-]+/g, "");
-      priceSTP = Number(cleaned) || 0;
+      priceSTP = parseIndonesianPrice(val);
+    } else if (
+      key.includes("pricesrp") || 
+      key.includes("srp") || 
+      key.includes("retail") || 
+      key.includes("hargasrp") || 
+      key.includes("priceforretail")
+    ) {
+      priceSRP = parseIndonesianPrice(val);
     }
   }
 
@@ -149,6 +182,7 @@ function mapFuzzyItem(item: any): SKUData {
     subsegment: subsegment || "Serum",
     priceSIP: priceSIP || Number(item.priceSIP) || 0,
     priceSTP: priceSTP || Number(item.priceSTP) || 0,
+    priceSRP: priceSRP || Number(item.priceSRP) || 0,
   };
 }
 
@@ -322,9 +356,11 @@ export function SKUList() {
         } else if (header.includes("subsegment") || header.includes("sub_segment")) {
           item.subsegment = val;
         } else if (header.includes("sip") || header.includes("distri")) {
-          item.priceSIP = Number(val.replace(/[^0-9.-]+/g, "")) || 0;
+          item.priceSIP = parseIndonesianPrice(val);
         } else if (header.includes("stp") || header.includes("store")) {
-          item.priceSTP = Number(val.replace(/[^0-9.-]+/g, "")) || 0;
+          item.priceSTP = parseIndonesianPrice(val);
+        } else if (header.includes("srp") || header.includes("retail")) {
+          item.priceSRP = parseIndonesianPrice(val);
         }
       }
       
@@ -338,6 +374,7 @@ export function SKUList() {
         item.subsegment = item.subsegment || "Serum";
         item.priceSIP = item.priceSIP || 0;
         item.priceSTP = item.priceSTP || 0;
+        item.priceSRP = item.priceSRP || 0;
         parsedData.push(item as SKUData);
       }
     }
@@ -633,11 +670,16 @@ export function SKUList() {
     const avgSTP = totalCount > 0 
       ? filteredSKUs.reduce((sum, item) => sum + item.priceSTP, 0) / totalCount 
       : 0;
+
+    const avgSRP = totalCount > 0 
+      ? filteredSKUs.reduce((sum, item) => sum + (item.priceSRP || 0), 0) / totalCount 
+      : 0;
     
     return {
       totalCount,
       avgSIP,
-      avgSTP
+      avgSTP,
+      avgSRP
     };
   }, [filteredSKUs]);
 
@@ -653,7 +695,8 @@ export function SKUList() {
       "Segment": item.segment,
       "Subsegment": item.subsegment,
       "SIP (Distributor Price)": item.priceSIP,
-      "STP (Store Price)": item.priceSTP
+      "STP (Store Price)": item.priceSTP,
+      "SRP (Retail Price)": item.priceSRP || 0
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -849,6 +892,8 @@ function doGet(e) {
         item.priceSIP = Number(val) || 0;
       } else if (header.indexOf("stp") !== -1 || header.indexOf("store") !== -1) {
         item.priceSTP = Number(val) || 0;
+      } else if (header.indexOf("srp") !== -1 || header.indexOf("retail") !== -1) {
+        item.priceSRP = Number(val) || 0;
       }
     }
     
@@ -862,6 +907,7 @@ function doGet(e) {
       if (!item.subsegment) item.subsegment = "Serum";
       if (typeof item.priceSIP !== 'number') item.priceSIP = 0;
       if (typeof item.priceSTP !== 'number') item.priceSTP = 0;
+      if (typeof item.priceSRP !== 'number') item.priceSRP = 0;
       
       result.push(item);
     }
@@ -909,7 +955,7 @@ function doGet(e) {
       )}
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* KPI 1 */}
         <div className="p-5 rounded-2xl border bg-white border-slate-100 shadow-sm flex flex-col justify-between hover:translate-y-[-2px] transition-all duration-300 min-w-0 overflow-hidden">
           <div className="flex flex-col min-w-0">
@@ -957,8 +1003,26 @@ function doGet(e) {
             </div>
           </div>
           <div className="mt-4 flex items-center gap-1.5 shrink-0">
-            <div className="flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
+            <div className="flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
               Store Base Rate
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 4 */}
+        <div className="p-5 rounded-2xl border bg-white border-slate-100 shadow-sm flex flex-col justify-between hover:translate-y-[-2px] transition-all duration-300 min-w-0 overflow-hidden">
+          <div className="flex flex-col min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-widest mb-1 truncate text-slate-400">Avg. Retail Price (SRP)</span>
+            <div className="flex items-baseline gap-0.5 min-w-0">
+              <span className="text-sm font-bold opacity-70 text-slate-500 mr-0.5">Rp</span>
+              <span className="text-xl font-black tracking-tight text-emerald-700 truncate" title={formatRupiah(metrics.avgSRP)}>
+                {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 }).format(metrics.avgSRP)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
+              Retail Price (SRP)
             </div>
           </div>
         </div>
@@ -1137,6 +1201,7 @@ function doGet(e) {
               <col className="w-[110px]" />
               <col className="w-[130px]" />
               <col className="w-[130px]" />
+              <col className="w-[130px]" />
             </colgroup>
             <thead>
               <tr className="bg-blue-600 text-white font-black text-[10px] tracking-widest uppercase border-b border-blue-700">
@@ -1210,6 +1275,13 @@ function doGet(e) {
                     <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                   </div>
                 </th>
+                {/* Column 11: Price For Retail (SRP) */}
+                <th className="px-4 py-3.5 text-right cursor-pointer select-none hover:bg-blue-700 transition" onClick={() => handleSort("priceSRP")}>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    Price Retail (SRP)
+                    <ArrowUpDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="text-xs divide-y divide-slate-100">
@@ -1273,12 +1345,16 @@ function doGet(e) {
                       <td className="px-4 py-2.5 text-right font-black text-blue-700 tabular-nums truncate">
                         {formatRupiah(item.priceSTP)}
                       </td>
+                      {/* Column 10: Price For Retail (SRP) */}
+                      <td className="px-4 py-2.5 text-right font-black text-emerald-700 tabular-nums truncate">
+                        {formatRupiah(item.priceSRP || 0)}
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={10} className="px-4 py-20 text-center text-slate-400">
+                  <td colSpan={11} className="px-4 py-20 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="p-3 bg-slate-50 text-slate-400 rounded-full">
                         <Package className="w-8 h-8" />

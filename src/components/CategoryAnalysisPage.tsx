@@ -865,7 +865,6 @@ export default function CategoryAnalysisPage() {
               <div className="flex flex-col min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-widest mb-1 truncate text-emerald-500">Sell Out Value</span>
                 <div className="flex items-baseline gap-0.5 min-w-0">
-                  <span className="text-sm font-bold opacity-70 text-emerald-600">Rp</span>
                   <span className="text-xl font-black tracking-tight truncate text-emerald-600" title={"Rp" + formatNumber(kpis.totalSellOut)}>
                     {formatCompactIDR(kpis.totalSellOut)}
                   </span>
@@ -881,7 +880,6 @@ export default function CategoryAnalysisPage() {
               <div className="flex flex-col min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-widest mb-1 truncate text-blue-500">Sell Through Value</span>
                 <div className="flex items-baseline gap-0.5 min-w-0">
-                  <span className="text-sm font-bold opacity-70 text-blue-600">Rp</span>
                   <span className="text-xl font-black tracking-tight truncate text-blue-600" title={"Rp" + formatNumber(kpis.totalSellThrough)}>
                     {formatCompactIDR(kpis.totalSellThrough)}
                   </span>
