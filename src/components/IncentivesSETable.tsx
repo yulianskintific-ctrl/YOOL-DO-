@@ -122,7 +122,7 @@ function MultiSelect({ label, options, selectedValues, onChange, placeholder }: 
             <button
               type="button"
               onClick={handleClearAll}
-              className="text-[9.5px] font-black text-slate-500 hover:text-slate-705 uppercase tracking-widest px-2.5 py-1 rounded-lg hover:bg-white transition-all cursor-pointer"
+              className="text-[9.5px] font-black text-slate-500 hover:text-slate-700 uppercase tracking-widest px-2.5 py-1 rounded-lg hover:bg-white transition-all cursor-pointer"
             >
               Clear
             </button>
@@ -314,7 +314,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
       {/* 1. SE FILTERS ROW CARD */}
       <motion.div 
         variants={itemVariants} 
-        className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-10 flex flex-wrap items-end gap-6 text-slate-805"
+        className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-10 flex flex-wrap items-end gap-6 text-slate-800"
       >
         <div className="flex flex-col gap-1.5 h-full self-start pt-1">
           <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-lg shadow-blue-105">
@@ -470,7 +470,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_total_gmv)}</td>
                     <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_total_gmv)}</td>
@@ -524,7 +524,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_gmv_sa)}</td>
                     <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_gmv_sa)}</td>
@@ -578,7 +578,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_gmv_bcd)}</td>
                     <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_gmv_bcd)}</td>
@@ -632,7 +632,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">{formatNumber(totals.target_ao)}</td>
                     <td className="py-4 px-6 text-right text-blue-700">{formatNumber(totals.ach_ao)}</td>
@@ -686,7 +686,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">{formatNumber(totals.target_ec)}</td>
                     <td className="py-4 px-6 text-right text-blue-700">{formatNumber(totals.ach_ec)}</td>
@@ -740,7 +740,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_st_product_focus)}</td>
                     <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_st_product_focus)}</td>
@@ -794,7 +794,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">{formatNumber(totals.target_ao_product_focus)}</td>
                     <td className="py-4 px-6 text-right text-blue-700">{formatNumber(totals.ach_ao_product_focus)}</td>
@@ -851,7 +851,7 @@ export default function IncentivesSETable({ data }: IncentivesSETableProps) {
                     );
                   })}
                   {/* Summary row */}
-                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+                  <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                     <td className="py-4 px-6 uppercase tracking-wider" colSpan={4}>Grand Total</td>
                     <td className="py-4 px-6 text-right">Rp {formatNumber(totals.incentive_gmv)}</td>
                     <td className="py-4 px-6 text-right">Rp {formatNumber(totals.incentive_ao)}</td>

@@ -145,7 +145,7 @@ export default function IncentivesSPVTable({ data }: IncentivesSPVTableProps) {
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={3}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_total_gmv)}</td>
                 <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_total_gmv)}</td>
@@ -197,7 +197,7 @@ export default function IncentivesSPVTable({ data }: IncentivesSPVTableProps) {
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-amber-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-amber-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={3}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_gmv_sa)}</td>
                 <td className="py-4 px-6 text-right text-amber-700">Rp {formatNumber(totals.ach_gmv_sa)}</td>
@@ -249,7 +249,7 @@ export default function IncentivesSPVTable({ data }: IncentivesSPVTableProps) {
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-indigo-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-indigo-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={3}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_gmv_bcd)}</td>
                 <td className="py-4 px-6 text-right text-indigo-700">Rp {formatNumber(totals.ach_gmv_bcd)}</td>
@@ -301,7 +301,7 @@ export default function IncentivesSPVTable({ data }: IncentivesSPVTableProps) {
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-emerald-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-emerald-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={3}>Grand Total</td>
                 <td className="py-4 px-6 text-right">{formatNumber(totals.target_ao)}</td>
                 <td className="py-4 px-6 text-right text-emerald-700">{formatNumber(totals.ach_ao)}</td>
@@ -353,7 +353,7 @@ export default function IncentivesSPVTable({ data }: IncentivesSPVTableProps) {
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-purple-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-purple-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={3}>Grand Total</td>
                 <td className="py-4 px-6 text-right">{formatNumber(totals.target_ec)}</td>
                 <td className="py-4 px-6 text-right text-purple-700">{formatNumber(totals.ach_ec)}</td>
@@ -405,7 +405,7 @@ export default function IncentivesSPVTable({ data }: IncentivesSPVTableProps) {
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-teal-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-teal-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={3}>Grand Total</td>
                 <td className="py-4 px-6 text-right">{formatNumber(totals.target_msl)}</td>
                 <td className="py-4 px-6 text-right text-teal-700">{formatNumber(totals.ach_msl)}</td>

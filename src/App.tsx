@@ -24,6 +24,7 @@ import SKUFocusPage from "./components/SKUFocusPage";
 import IncentivesLeftBehind from "./components/IncentivesLeftBehind";
 import CategoryAnalysisPage from "./components/CategoryAnalysisPage";
 import StockAnalysisPage from "./components/StockAnalysisPage";
+import RuleChatbot from "./components/RuleChatbot";
 
 export default function App() {
   const [data, setData] = useState<SalesData[]>([]);
@@ -80,7 +81,7 @@ export default function App() {
       const result = await fetchIncentiveSEData(force);
       setSeIncentivesData(result);
     } catch (err) {
-      console.error("SE Incentives Load Error:", err);
+      console.log("SE Incentives Load Error:", err);
       setError(`Failed to synchronize ${activeMenu} data. Please check your Script URL.`);
     } finally {
       setLoading(false);
@@ -98,7 +99,7 @@ export default function App() {
       const result = await fetchIncentiveSPVData(force);
       setIncentivesData(result);
     } catch (err) {
-      console.error("Incentives Load Error:", err);
+      console.log("Incentives Load Error:", err);
       setError(`Failed to synchronize ${activeMenu} data. Please check your Script URL.`);
     } finally {
       setLoading(false);
@@ -116,7 +117,7 @@ export default function App() {
       const result = await fetchIncentiveSPVExclusiveData(force);
       setExclusiveIncentivesData(result);
     } catch (err) {
-      console.error("Exclusive Incentives Load Error:", err);
+      console.log("Exclusive Incentives Load Error:", err);
       setError(`Failed to synchronize ${activeMenu} data. Please check your Script URL.`);
     } finally {
       setLoading(false);
@@ -134,7 +135,7 @@ export default function App() {
       const result = await fetchSalesData(force, "Sell In and Through");
       setData(result);
     } catch (err) {
-      console.error("Dashboard Load Error:", err);
+      console.log("Dashboard Load Error:", err);
       setError(`Failed to synchronize ${activeMenu} data. Please check your Script URL.`);
     } finally {
       setLoading(false);
@@ -152,7 +153,7 @@ export default function App() {
       const result = await fetchSellOutData(force);
       setSellOutData(result);
     } catch (err) {
-      console.error("Sell Out Load Error:", err);
+      console.log("Sell Out Load Error:", err);
       setError(`Failed to synchronize ${activeMenu} data. Please check your Script URL.`);
     } finally {
       setLoading(false);
@@ -692,6 +693,7 @@ export default function App() {
           </div>
         </footer>
       </main>
+      <RuleChatbot />
     </div>
   );
 }

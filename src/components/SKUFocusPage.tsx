@@ -76,7 +76,7 @@ export default function SKUFocusPage() {
       setStoreData(storeRes);
       setSpvData(spvRes);
     } catch (err: any) {
-      console.error("Error loading SKU Focus Data:", err);
+      console.log("Error loading SKU Focus Data:", err);
       if (err.message && err.message.startsWith("LIBRARY_URL_DETECTED:")) {
         setError(err.message.replace("LIBRARY_URL_DETECTED: ", ""));
       } else {

@@ -17,7 +17,8 @@ import {
   Target,
   ExternalLink,
   PieChart,
-  Boxes
+  Boxes,
+  MessageSquare
 } from "lucide-react";
 
 export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolean }[] = [

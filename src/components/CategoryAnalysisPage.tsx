@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import * as XLSX from "xlsx";
 import { CategoryAnalysisData } from "../types";
 import { fetchCategoryAnalysisData } from "../services/api";
 import { formatNumber, formatCompactIDR, formatCurrency } from "../lib/utils";
@@ -58,6 +59,119 @@ const getCategoryColor = (category: string) => {
   return CATEGORY_COLORS[norm] || CATEGORY_COLORS.UNKNOWN;
 };
 
+interface MultiSelectProps {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+}
+
+function MultiSelect({ label, options, selected, onChange, placeholder }: MultiSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter(item => item !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const selectAll = () => {
+    onChange([]);
+  };
+
+  const displayText = selected.length === 0
+    ? `All ${placeholder}s`
+    : selected.length === options.length
+    ? `All ${placeholder}s`
+    : selected.length <= 2
+    ? selected.join(", ")
+    : `${selected.length} ${placeholder}s Selected`;
+
+  return (
+    <div className="space-y-1.5" ref={dropdownRef}>
+      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</label>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full bg-slate-50/50 hover:bg-slate-50 border border-slate-200/50 text-slate-700 rounded-xl px-3 py-2.5 text-xs font-semibold text-left flex items-center justify-between cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500/30 min-h-[38px]"
+        >
+          <span className="truncate pr-4">{displayText}</span>
+          <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {isOpen && (
+          <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200/60 shadow-lg rounded-xl max-h-64 flex flex-col overflow-hidden animate-fade-in">
+            {options.length > 5 && (
+              <div className="p-2 border-b border-slate-100">
+                <input
+                  type="text"
+                  placeholder="Cari..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-blue-400 font-medium text-slate-600"
+                />
+              </div>
+            )}
+            <div className="overflow-y-auto flex-1 p-1.5 space-y-0.5 max-h-48 custom-scrollbar">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer text-left"
+              >
+                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                  selected.length === 0 ? "border-blue-500 bg-blue-500 text-white" : "border-slate-300"
+                }`}>
+                  {selected.length === 0 && <span className="text-[9px] font-bold">✓</span>}
+                </div>
+                <span>All {placeholder}s</span>
+              </button>
+              
+              {filteredOptions.map((opt) => {
+                const isChecked = selected.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => toggleOption(opt)}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
+                  >
+                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                      isChecked ? "border-blue-500 bg-blue-500 text-white" : "border-slate-300"
+                    }`}>
+                      {isChecked && <span className="text-[9px] font-bold">✓</span>}
+                    </div>
+                    <span className="truncate">{opt}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CategoryAnalysisPage() {
   const [rawData, setRawData] = useState<CategoryAnalysisData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,10 +180,10 @@ export default function CategoryAnalysisPage() {
   const [activeHeatmapTab, setActiveHeatmapTab] = useState<"sell_out" | "sell_through">("sell_out");
 
   // Filters State
-  const [selectedMonth, setSelectedMonth] = useState<string>("All");
-  const [selectedRegion, setSelectedRegion] = useState<string>("All");
-  const [selectedDistributor, setSelectedDistributor] = useState<string>("All");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [selectedDistributors, setSelectedDistributors] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Pagination State
@@ -179,17 +293,17 @@ export default function CategoryAnalysisPage() {
     });
 
     // 1. Dropdown Filters
-    if (selectedMonth !== "All") {
-      result = result.filter((item) => item.month === selectedMonth);
+    if (selectedMonths.length > 0) {
+      result = result.filter((item) => item.month && selectedMonths.includes(item.month));
     }
-    if (selectedRegion !== "All") {
-      result = result.filter((item) => item.region === selectedRegion);
+    if (selectedRegions.length > 0) {
+      result = result.filter((item) => item.region && selectedRegions.includes(item.region));
     }
-    if (selectedDistributor !== "All") {
-      result = result.filter((item) => item.distributor_name === selectedDistributor);
+    if (selectedDistributors.length > 0) {
+      result = result.filter((item) => item.distributor_name && selectedDistributors.includes(item.distributor_name));
     }
-    if (selectedCategory !== "All") {
-      result = result.filter((item) => item.category === selectedCategory);
+    if (selectedCategories.length > 0) {
+      result = result.filter((item) => item.category && selectedCategories.includes(item.category));
     }
 
     // 2. Text Search (filters SKU, Item ID, or Distributor)
@@ -222,14 +336,14 @@ export default function CategoryAnalysisPage() {
     }
 
     return result;
-  }, [rawData, selectedMonth, selectedRegion, selectedDistributor, selectedCategory, searchQuery, sortField, sortDirection]);
+  }, [rawData, selectedMonths, selectedRegions, selectedDistributors, selectedCategories, searchQuery, sortField, sortDirection]);
 
   // Reset Filters
   const resetFilters = () => {
-    setSelectedMonth("All");
-    setSelectedRegion("All");
-    setSelectedDistributor("All");
-    setSelectedCategory("All");
+    setSelectedMonths([]);
+    setSelectedRegions([]);
+    setSelectedDistributors([]);
+    setSelectedCategories([]);
     setSearchQuery("");
     setCurrentPage(1);
   };
@@ -592,8 +706,8 @@ export default function CategoryAnalysisPage() {
     return { totalQtyST, totalQtySO, totalSellThrough, totalSellOut };
   }, [aggregatedMasterData]);
 
-  // CSV Export
-  const exportToCSV = () => {
+  // Excel Export
+  const exportToExcel = () => {
     const headers = [
       "Region",
       "Distributor Name",
@@ -607,28 +721,22 @@ export default function CategoryAnalysisPage() {
     ];
 
     const rows = aggregatedMasterData.map((item) => [
-      item.region,
-      item.distributor_name,
-      item.item_id,
-      `"${item.sku.replace(/"/g, '""')}"`,
-      item.category,
-      item.qtyST,
-      item.qtySO,
-      item.sell_through_value,
-      item.sell_out_value
+      item.region || "",
+      item.distributor_name || "",
+      item.item_id || "",
+      item.sku || "",
+      item.category || "",
+      item.qtyST || 0,
+      item.qtySO || 0,
+      item.sell_through_value || 0,
+      item.sell_out_value || 0
     ]);
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Category Analysis");
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Category_Analysis_Report_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    XLSX.writeFile(workbook, `Category_Analysis_Report_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   if (loading) {
@@ -665,12 +773,12 @@ export default function CategoryAnalysisPage() {
             {refreshing ? "Syncing..." : "Sync Spreadsheet"}
           </button>
           <button
-            onClick={exportToCSV}
+            onClick={exportToExcel}
             disabled={processedData.length === 0}
             className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-xs font-bold text-white rounded-xl hover:bg-blue-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download size={14} />
-            Export CSV
+            Export Excel
           </button>
         </div>
       </div>
@@ -715,7 +823,7 @@ export default function CategoryAnalysisPage() {
               <Filter size={14} /> Interactive Filters
             </h3>
           </div>
-          {(selectedMonth !== "All" || selectedRegion !== "All" || selectedDistributor !== "All" || selectedCategory !== "All" || searchQuery !== "") && (
+          {(selectedMonths.length > 0 || selectedRegions.length > 0 || selectedDistributors.length > 0 || selectedCategories.length > 0 || searchQuery !== "") && (
             <button
               onClick={resetFilters}
               className="text-xs font-bold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
@@ -727,96 +835,52 @@ export default function CategoryAnalysisPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Month Filter */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Month</label>
-            <div className="relative">
-              <select
-                value={selectedMonth}
-                onChange={(e) => {
-                  setSelectedMonth(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-50 border border-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="All">All Months</option>
-                {filterOptions.months.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="Month"
+            options={filterOptions.months}
+            selected={selectedMonths}
+            onChange={(selected) => {
+              setSelectedMonths(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Month"
+          />
 
           {/* Region Filter */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Region</label>
-            <div className="relative">
-              <select
-                value={selectedRegion}
-                onChange={(e) => {
-                  setSelectedRegion(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-50 border border-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="All">All Regions</option>
-                {filterOptions.regions.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="Region"
+            options={filterOptions.regions}
+            selected={selectedRegions}
+            onChange={(selected) => {
+              setSelectedRegions(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Region"
+          />
 
           {/* Distributor Filter */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Distributor</label>
-            <div className="relative">
-              <select
-                value={selectedDistributor}
-                onChange={(e) => {
-                  setSelectedDistributor(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-50 border border-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="All">All Distributors</option>
-                {filterOptions.distributors.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="Distributor"
+            options={filterOptions.distributors}
+            selected={selectedDistributors}
+            onChange={(selected) => {
+              setSelectedDistributors(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Distributor"
+          />
 
           {/* Category Filter */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Category</label>
-            <div className="relative">
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full bg-slate-50 border border-slate-100 text-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="All">All Categories</option>
-                {filterOptions.categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="Category"
+            options={filterOptions.categories}
+            selected={selectedCategories}
+            onChange={(selected) => {
+              setSelectedCategories(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Category"
+          />
         </div>
 
         {/* Search input bar */}

@@ -202,7 +202,7 @@ export default function IncentivesSPVExclusiveTable({ data }: IncentivesSPVExclu
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={5}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_total_gmv)}</td>
                 <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_total_gmv)}</td>
@@ -258,7 +258,7 @@ export default function IncentivesSPVExclusiveTable({ data }: IncentivesSPVExclu
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={5}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_gmv_sa)}</td>
                 <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_gmv_sa)}</td>
@@ -314,7 +314,7 @@ export default function IncentivesSPVExclusiveTable({ data }: IncentivesSPVExclu
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={5}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_gmv_bcd)}</td>
                 <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_gmv_bcd)}</td>
@@ -377,7 +377,7 @@ export default function IncentivesSPVExclusiveTable({ data }: IncentivesSPVExclu
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={5}>Grand Total</td>
                 <td className="py-4 px-4 text-right">{formatNumber(totals.target_ao)}</td>
                 <td className="py-4 px-4 text-right text-blue-700">{formatNumber(totals.ach_ao)}</td>
@@ -438,7 +438,7 @@ export default function IncentivesSPVExclusiveTable({ data }: IncentivesSPVExclu
                 );
               })}
               {/* Summary Row */}
-              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={5}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.target_msl)}</td>
                 <td className="py-4 px-6 text-right text-blue-700">Rp {formatNumber(totals.ach_msl)}</td>
@@ -498,7 +498,7 @@ export default function IncentivesSPVExclusiveTable({ data }: IncentivesSPVExclu
                 );
               })}
               {/* Grand Totals */}
-              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-150">
+              <tr className="bg-blue-50/30 font-black text-xs text-slate-800 border-t-2 border-slate-200/60">
                 <td className="py-4 px-6 uppercase tracking-wider" colSpan={5}>Grand Total</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.incentive_gmv)}</td>
                 <td className="py-4 px-6 text-right">Rp {formatNumber(totals.incentive_ao)}</td>

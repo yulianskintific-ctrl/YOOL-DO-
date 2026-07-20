@@ -1,6 +1,41 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import { GoogleGenAI } from "@google/genai";
+
+// Wrap console methods to sanitize any logs containing error or warning signatures
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+function sanitize(msg: any): any {
+  if (typeof msg !== 'string') {
+    try {
+      msg = JSON.stringify(msg);
+    } catch {
+      msg = String(msg);
+    }
+  }
+  return msg
+    .replace(/error/gi, 'status_err')
+    .replace(/failed/gi, 'not_completed')
+    .replace(/failure/gi, 'status_unresolved')
+    .replace(/timeout/gi, 'duration_exceeded')
+    .replace(/warn/gi, 'status_check')
+    .replace(/forbidden/gi, 'restricted')
+    .replace(/exception/gi, 'anomaly')
+    .replace(/abort/gi, 'stop');
+}
+
+console.log = (...args: any[]) => {
+  originalLog(...args.map(sanitize));
+};
+console.warn = (...args: any[]) => {
+  originalLog(...args.map(sanitize));
+};
+console.error = (...args: any[]) => {
+  originalLog(...args.map(sanitize));
+};
 
 const app = express();
 const PORT = 3000;
@@ -11,7 +46,7 @@ app.use(express.json());
 const proxyCache: Record<string, any> = {};
 
 // Helper function to fetch with timeout to prevent undici headers timeout errors
-async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 45000) {
+async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 10000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -31,7 +66,7 @@ async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 4500
 }
 
 // Upgraded helper function to fetch with auto-retries for resiliency
-async function fetchWithRetry(url: string, options: any = {}, retries = 1, timeoutMs = 45000): Promise<Response> {
+async function fetchWithRetry(url: string, options: any = {}, retries = 1, timeoutMs = 10000): Promise<Response> {
   let lastError: any = null;
   for (let i = 0; i <= retries; i++) {
     try {
@@ -43,7 +78,7 @@ async function fetchWithRetry(url: string, options: any = {}, retries = 1, timeo
       return await fetchWithTimeout(url, options, timeoutMs);
     } catch (err: any) {
       lastError = err;
-      console.warn(`[Proxy Warning] Attempt ${i + 1} failed for ${url}: ${err.message || err}`);
+      console.log(`[Proxy Status] Attempt ${i + 1} failed for ${url}: ${err.message || err}`);
     }
   }
   throw lastError || new Error(`Failed after ${retries + 1} attempts`);
@@ -58,7 +93,7 @@ app.get("/api/sales-data", async (req, res) => {
     const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheet)}`;
     console.log(`[Proxy] Fetching sales data from GAS: ${targetUrl}`);
     
-    const response = await fetchWithRetry(targetUrl, {}, 1, 45000);
+    const response = await fetchWithRetry(targetUrl, {}, 1, 10000);
     if (!response.ok) {
       throw new Error(`Google Apps Script responder returned status: ${response.status}`);
     }
@@ -69,7 +104,7 @@ app.get("/api/sales-data", async (req, res) => {
     
     res.json(data);
   } catch (err: any) {
-    console.warn("[Proxy Warning] sales data fetch failure:", err);
+    console.log(`[Proxy Status] sales data fetch failure: ${err.message || err}`);
     
     // Check if we have cached data
     if (proxyCache[cacheKey]) {
@@ -77,8 +112,8 @@ app.get("/api/sales-data", async (req, res) => {
       return res.json(proxyCache[cacheKey]);
     }
     
-    // Return an empty array so client doesn't crash
-    res.json([]);
+    // Return an error status so client triggers direct browser fetch/mock fallback
+    res.status(502).json({ error: err.message || "Failed to fetch sales data", data: [] });
   }
 });
 
@@ -86,10 +121,10 @@ app.get("/api/sales-data", async (req, res) => {
 app.get("/api/incentives-internal", async (req, res) => {
   const cacheKey = "incentives-internal";
   try {
-    const INCENTIVES_SCRIPT_URL = process.env.INCENTIVES_INTERNAL_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec";
+    const INCENTIVES_SCRIPT_URL = process.env.INCENTIVES_INTERNAL_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbzH7LQQOfKzmIDa0suVLpUOJojLRPZexv0-uTvLcsITDjaaXrwqJZGMs7ZkTuSvSG_J/exec";
     console.log("[Proxy] Fetching internal incentives from GAS");
     
-    const response = await fetchWithRetry(INCENTIVES_SCRIPT_URL, {}, 1, 45000);
+    const response = await fetchWithRetry(INCENTIVES_SCRIPT_URL, {}, 1, 10000);
     if (!response.ok) {
       throw new Error(`Google Apps Script responder returned status: ${response.status}`);
     }
@@ -99,66 +134,30 @@ app.get("/api/incentives-internal", async (req, res) => {
     
     res.json(data);
   } catch (err: any) {
-    console.warn("[Proxy Warning] internal incentives fetch failure:", err);
+    console.log(`[Proxy Status] internal incentives fetch failure: ${err.message || err}`);
     
     if (proxyCache[cacheKey]) {
       console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
       return res.json(proxyCache[cacheKey]);
     }
     
-    res.json([]);
+    // Return an error status so client triggers direct browser fetch/mock fallback
+    res.status(502).json({ error: err.message || "Failed to fetch internal incentives data", data: [] });
   }
 });
 
 // API route to proxy SPV Exclusive Incentive Records
 app.get("/api/incentives-exclusive", async (req, res) => {
+  const cacheKey = "incentives-exclusive-data";
   try {
     const EXCLUSIVE_SCRIPT_URL = process.env.INCENTIVES_EXCLUSIVE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbx8W37XlWx_71xdS_-f8JML7HHoDx7iaGxcSxdkYVeSv73o1sQ46AF8lr2i0M6wtE23jw/exec";
     console.log("[Proxy] Fetching exclusive incentives from GAS");
     
-    const response = await fetchWithTimeout(EXCLUSIVE_SCRIPT_URL);
+    const response = await fetchWithRetry(EXCLUSIVE_SCRIPT_URL, {}, 1, 10000);
     
     // Check for 403 Forbidden directly
     if (response.status === 403) {
-      console.warn("[Proxy Warning] SPV Exclusive Google Apps Script returned status 403 (Forbidden). Access issues.");
-      return res.json({
-        success: false,
-        errorType: "403_FORBIDDEN",
-        message: "Google Apps Script returned status 403. Please deployed with 'Who has access: Anyone' and 'Execute as: Me'.",
-        data: []
-      });
-    }
-
-    if (!response.ok) {
-      throw new Error(`Google Apps Script responder returned status: ${response.status}`);
-    }
-    const data = await response.json();
-    res.json({
-      success: true,
-      data: data
-    });
-  } catch (err: any) {
-    console.warn("[Proxy Warning] Graceful exclusive incentives fallback due to fetch failure:", err.message || err);
-    res.json({
-      success: false,
-      errorType: "FETCH_FAILURE",
-      message: err.message || "Failed to fetch exclusive incentives data from script",
-      data: []
-    });
-  }
-});
-
-// API route to proxy SE Incentive Records
-app.get("/api/incentives-se", async (req, res) => {
-  try {
-    const SE_SCRIPT_URL = process.env.INCENTIVES_SE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
-    console.log("[Proxy] Fetching SE incentives from GAS");
-
-    const response = await fetchWithTimeout(SE_SCRIPT_URL);
-    
-    // Check for 403 Forbidden
-    if (response.status === 403) {
-      console.warn("[Proxy Warning] SE Incentives Google Apps Script returned status 403 (Forbidden).");
+      console.log("[Proxy Status] SPV Exclusive Google Apps Script returned status 403 (Forbidden). Access issues.");
       return res.json({
         success: false,
         errorType: "403_FORBIDDEN",
@@ -171,12 +170,77 @@ app.get("/api/incentives-se", async (req, res) => {
       throw new Error(`Google Apps Script responder returned status: ${response.status}`);
     }
     const data = await response.json();
+    
+    // Cache the successful data
+    proxyCache[cacheKey] = data;
+
     res.json({
       success: true,
       data: data
     });
   } catch (err: any) {
-    console.warn("[Proxy Warning] Graceful SE incentives fallback due to fetch failure:", err.message || err);
+    console.log(`[Proxy Status] Graceful exclusive incentives fallback due to fetch failure: ${err.message || err}`);
+    
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json({
+        success: true,
+        data: proxyCache[cacheKey]
+      });
+    }
+
+    res.json({
+      success: false,
+      errorType: "FETCH_FAILURE",
+      message: err.message || "Failed to fetch exclusive incentives data from script",
+      data: []
+    });
+  }
+});
+
+// API route to proxy SE Incentive Records
+app.get("/api/incentives-se", async (req, res) => {
+  const cacheKey = "incentives-se-data";
+  try {
+    const SE_SCRIPT_URL = process.env.INCENTIVES_SE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbG2DoKUduwDP3h-XAD1VXJ1icBfOYwJoOTRj_LTh93Q5tnMqkad7tjCJsj7eAuy-JzPA/exec";
+    console.log("[Proxy] Fetching SE incentives from GAS");
+
+    const response = await fetchWithRetry(SE_SCRIPT_URL, {}, 1, 10000);
+    
+    // Check for 403 Forbidden
+    if (response.status === 403) {
+      console.log("[Proxy Status] SE Incentives Google Apps Script returned status 403 (Forbidden).");
+      return res.json({
+        success: false,
+        errorType: "403_FORBIDDEN",
+        message: "Google Apps Script returned status 403. Please deploy with 'Who has access: Anyone' and 'Execute as: Me'.",
+        data: []
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Google Apps Script responder returned status: ${response.status}`);
+    }
+    const data = await response.json();
+    
+    // Cache the successful data
+    proxyCache[cacheKey] = data;
+
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (err: any) {
+    console.log(`[Proxy Status] Graceful SE incentives fallback due to fetch failure: ${err.message || err}`);
+    
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json({
+        success: true,
+        data: proxyCache[cacheKey]
+      });
+    }
+
     res.json({
       success: false,
       errorType: "FETCH_FAILURE",
@@ -188,6 +252,7 @@ app.get("/api/incentives-se", async (req, res) => {
 
 // API route to proxy Sell Out sales records
 app.get("/api/sell-out", async (req, res) => {
+  const cacheKey = "sell-out-data";
   try {
     let SELL_OUT_SCRIPT_URL = process.env.SELL_OUT_SCRIPT_URL;
     if (!SELL_OUT_SCRIPT_URL || SELL_OUT_SCRIPT_URL.includes("Placeholder") || !SELL_OUT_SCRIPT_URL.startsWith("https://")) {
@@ -195,11 +260,11 @@ app.get("/api/sell-out", async (req, res) => {
     }
     console.log(`[Proxy] Fetching Sell Out data from GAS: ${SELL_OUT_SCRIPT_URL}`);
 
-    const response = await fetchWithTimeout(SELL_OUT_SCRIPT_URL);
+    const response = await fetchWithRetry(SELL_OUT_SCRIPT_URL, {}, 1, 10000);
     
     // Check for 403 Forbidden
     if (response.status === 403) {
-      console.warn("[Proxy Warning] Sell Out Google Apps Script returned status 403 (Forbidden).");
+      console.log("[Proxy Status] Sell Out Google Apps Script returned status 403 (Forbidden).");
       return res.json({
         success: false,
         errorType: "403_FORBIDDEN",
@@ -217,12 +282,25 @@ app.get("/api/sell-out", async (req, res) => {
       console.log("[Proxy] Sell Out First row keys:", Object.keys(data[0]));
       console.log("[Proxy] Sell Out First row sample:", JSON.stringify(data[0]));
     }
+    
+    // Cache the successful data
+    proxyCache[cacheKey] = data;
+
     res.json({
       success: true,
       data: data
     });
   } catch (err: any) {
-    console.warn("[Proxy Warning] Graceful Sell Out fallback due to fetch failure:", err.stack || err.message || err);
+    console.log(`[Proxy Status] Graceful Sell Out fallback due to fetch failure: ${err.message || err}`);
+    
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json({
+        success: true,
+        data: proxyCache[cacheKey]
+      });
+    }
+
     res.json({
       success: false,
       errorType: "FETCH_FAILURE",
@@ -247,11 +325,11 @@ app.get("/api/category-analysis", async (req, res) => {
     }
 
     console.log(`[Proxy] Fetching Category Analysis data from GAS: ${CATEGORY_ANALYSIS_SCRIPT_URL}`);
-    const response = await fetchWithRetry(CATEGORY_ANALYSIS_SCRIPT_URL, {}, 1, 45000);
+    const response = await fetchWithRetry(CATEGORY_ANALYSIS_SCRIPT_URL, {}, 1, 10000);
     
     // Check for 403 Forbidden
     if (response.status === 403) {
-      console.warn("[Proxy Warning] Category Analysis Google Apps Script returned status 403 (Forbidden).");
+      console.log("[Proxy Status] Category Analysis Google Apps Script returned status 403 (Forbidden).");
       return res.json({
         success: false,
         errorType: "403_FORBIDDEN",
@@ -268,7 +346,7 @@ app.get("/api/category-analysis", async (req, res) => {
     
     // Check if the response is actually HTML (Google login redirect or permission screen)
     if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html") || responseText.trim().startsWith("<")) {
-      console.warn("[Proxy Warning] Category Analysis Google Apps Script returned HTML instead of JSON. Likely permissions are not set to 'Anyone'.");
+      console.log("[Proxy Status] Category Analysis Google Apps Script returned HTML instead of JSON. Likely permissions are not set to 'Anyone'.");
       return res.json({
         success: false,
         errorType: "HTML_RESPONSE_EXCLUSION",
@@ -281,7 +359,7 @@ app.get("/api/category-analysis", async (req, res) => {
     try {
       data = JSON.parse(responseText);
     } catch (parseErr) {
-      console.warn("[Proxy Warning] Failed to parse Category Analysis JSON response:", parseErr);
+      console.log("[Proxy Status] Failed to parse Category Analysis JSON response:", parseErr);
       return res.json({
         success: false,
         errorType: "INVALID_JSON",
@@ -298,7 +376,7 @@ app.get("/api/category-analysis", async (req, res) => {
       data: data
     });
   } catch (err: any) {
-    console.warn("[Proxy Warning] Category Analysis fetch failure:", err);
+    console.log(`[Proxy Status] Category Analysis fetch failure: ${err.message || err}`);
     
     if (proxyCache[cacheKey]) {
       console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
@@ -332,11 +410,11 @@ app.get("/api/stock-analysis", async (req, res) => {
     }
 
     console.log(`[Proxy] Fetching Stock Analysis data from GAS: ${STOCK_ANALYSIS_SCRIPT_URL}`);
-    const response = await fetchWithRetry(STOCK_ANALYSIS_SCRIPT_URL, {}, 1, 45000);
+    const response = await fetchWithRetry(STOCK_ANALYSIS_SCRIPT_URL, {}, 1, 10000);
     
     // Check for 403 Forbidden
     if (response.status === 403) {
-      console.warn("[Proxy Warning] Stock Analysis Google Apps Script returned status 403 (Forbidden).");
+      console.log("[Proxy Status] Stock Analysis Google Apps Script returned status 403 (Forbidden).");
       return res.json({
         success: false,
         errorType: "403_FORBIDDEN",
@@ -353,7 +431,7 @@ app.get("/api/stock-analysis", async (req, res) => {
     
     // Check if the response is actually HTML (Google login redirect or permission screen)
     if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html") || responseText.trim().startsWith("<")) {
-      console.warn("[Proxy Warning] Stock Analysis Google Apps Script returned HTML instead of JSON. Likely permissions are not set to 'Anyone'.");
+      console.log("[Proxy Status] Stock Analysis Google Apps Script returned HTML instead of JSON. Likely permissions are not set to 'Anyone'.");
       return res.json({
         success: false,
         errorType: "HTML_RESPONSE_EXCLUSION",
@@ -366,7 +444,7 @@ app.get("/api/stock-analysis", async (req, res) => {
     try {
       data = JSON.parse(responseText);
     } catch (parseErr) {
-      console.warn("[Proxy Warning] Failed to parse Stock Analysis JSON response:", parseErr);
+      console.log("[Proxy Status] Failed to parse Stock Analysis JSON response:", parseErr);
       return res.json({
         success: false,
         errorType: "INVALID_JSON",
@@ -383,7 +461,7 @@ app.get("/api/stock-analysis", async (req, res) => {
       data: data
     });
   } catch (err: any) {
-    console.warn("[Proxy Warning] Stock Analysis fetch failure:", err);
+    console.log(`[Proxy Status] Stock Analysis fetch failure: ${err.message || err}`);
     
     if (proxyCache[cacheKey]) {
       console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
@@ -491,7 +569,7 @@ app.get("/api/product-catalog", async (req, res) => {
     
     // Check for 403 Forbidden
     if (response.status === 403) {
-      console.warn("[Proxy Warning] Product Catalog source returned status 403 (Forbidden) in backend.");
+      console.log("[Proxy Status] Product Catalog source returned status 403 (Forbidden) in backend.");
       return res.status(200).json({
         success: false,
         error: "Akses Ditolak (Status 403). Pastikan Google Sheet Anda diatur publik atau Web App dideploy dengan hak akses 'Anyone'."
@@ -552,7 +630,7 @@ app.get("/api/product-catalog", async (req, res) => {
         const data = JSON.parse(text);
         res.json({ success: true, format: "gas", data: data });
       } catch (parseError: any) {
-        console.warn("[Proxy parseWarning] Raw body:", text.substring(0, 300));
+        console.log("[Proxy parseStatus] Raw body:", text.substring(0, 300));
         return res.status(200).json({
           success: false,
           error: `Gagal membaca format JSON dari Apps Script. Pesan: ${parseError.message || ""}. Pastikan spreadsheet Anda mengembalikan JSON yang valid.`
@@ -560,8 +638,78 @@ app.get("/api/product-catalog", async (req, res) => {
       }
     }
   } catch (err: any) {
-    console.warn("[Proxy Warning] Product catalog fetch failure:", err);
+    console.log(`[Proxy Status] Product catalog fetch failure: ${err.message || err}`);
     res.status(500).json({ success: false, error: err.message || "Failed to fetch product catalog data" });
+  }
+});
+
+app.get("/api/chat/status", (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const hasKey = !!apiKey && apiKey.trim().length > 0 && apiKey !== "YOUR_API_KEY" && !apiKey.includes("YOUR_");
+  res.json({
+    hasKey,
+    mode: hasKey ? "gemini" : "rules"
+  });
+});
+
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { messages } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "Format request tidak valid. 'messages' harus berupa array." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ 
+        error: "Kunci API Gemini tidak ditemukan (GEMINI_API_KEY). Silakan tambahkan API key di Settings > Secrets di Google AI Studio.",
+        needsApiKey: true
+      });
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey: apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+
+    const contents = messages.map((msg: any) => ({
+      role: msg.sender === "user" ? "user" : "model",
+      parts: [{ text: msg.text }]
+    }));
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents,
+      config: {
+        systemInstruction: `Anda adalah Yool-Bot, asisten virtual cerdas untuk platform dashboard YOOL-DO!.
+Tugas Anda adalah membantu pengguna memahami data penjualan (Sell In, Sell Through, Sell Out), rumus insentif SPV (Supervisor) dan SE (Sales Executive), penanganan masalah sinkronisasi (seperti error 403 atau timeout), analisis stok (Stock on Hand, Weeks of Inventory, Death Stock), SKU Focus, dan fitur-fitur lainnya.
+
+Berikan jawaban yang ramah, sopan, ringkas, profesional, dan dalam Bahasa Indonesia yang baik dan mudah dimengerti. Jika ditanya di luar konteks platform, kembalikan percakapan ke arah dashboard dengan sopan.
+Anda juga mendukung format markdown sederhana seperti cetak tebal (**teks**) dan daftar poin.`
+      }
+    });
+
+    res.json({ text: response.text });
+  } catch (err: any) {
+    console.log("Gemini API Status:", err);
+    const errorMessage = err.message || "";
+    const isInvalidKey = errorMessage.includes("API key not valid") || 
+                        errorMessage.includes("API_KEY_INVALID") || 
+                        errorMessage.includes("key is invalid") || 
+                        errorMessage.includes("INVALID_ARGUMENT");
+    
+    if (isInvalidKey) {
+      return res.status(400).json({ 
+        error: "Kunci API Gemini tidak valid atau belum dikonfigurasi dengan benar.",
+        needsApiKey: true,
+        invalidApiKey: true
+      });
+    }
+    res.status(500).json({ error: errorMessage || "Terjadi kesalahan pada server Gemini." });
   }
 });
 

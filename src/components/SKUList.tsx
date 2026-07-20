@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { SKU_DATABASE, SKUData } from "../services/skuData";
 import { 
@@ -28,7 +28,8 @@ import {
   Copy,
   Code,
   FileSpreadsheet,
-  Loader2
+  Loader2,
+  ChevronDown
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -241,13 +242,126 @@ function parseJSONDataToSKUList(json: any): SKUData[] {
                   .filter((item: SKUData) => !!item.productCode);
 }
 
+interface MultiSelectProps {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder: string;
+}
+
+function MultiSelect({ label, options, selected, onChange, placeholder }: MultiSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter(item => item !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  const selectAll = () => {
+    onChange([]);
+  };
+
+  const displayText = selected.length === 0
+    ? `All ${placeholder}s`
+    : selected.length === options.length
+    ? `All ${placeholder}s`
+    : selected.length <= 2
+    ? selected.join(", ")
+    : `${selected.length} ${placeholder}s Selected`;
+
+  return (
+    <div className="space-y-1.5 w-full" ref={dropdownRef}>
+      <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block ml-1">{label}</label>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full bg-slate-50/50 hover:bg-slate-50 border border-slate-200/50 text-slate-700 rounded-xl px-4 py-2.5 text-xs font-semibold text-left flex items-center justify-between cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500/30 min-h-[38px] transition-all"
+        >
+          <span className="truncate pr-4">{displayText}</span>
+          <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {isOpen && (
+          <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200/60 shadow-lg rounded-xl max-h-64 flex flex-col overflow-hidden animate-fade-in">
+            {options.length > 5 && (
+              <div className="p-2 border-b border-slate-100">
+                <input
+                  type="text"
+                  placeholder="Cari..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-blue-400 font-medium text-slate-600"
+                />
+              </div>
+            )}
+            <div className="overflow-y-auto flex-1 p-1.5 space-y-0.5 max-h-48 custom-scrollbar">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer text-left"
+              >
+                <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                  selected.length === 0 ? "border-blue-500 bg-blue-500 text-white" : "border-slate-300"
+                }`}>
+                  {selected.length === 0 && <span className="text-[9px] font-bold">✓</span>}
+                </div>
+                <span>All {placeholder}s</span>
+              </button>
+              
+              {filteredOptions.map((opt) => {
+                const isChecked = selected.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => toggleOption(opt)}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer text-left"
+                  >
+                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                      isChecked ? "border-blue-500 bg-blue-500 text-white" : "border-slate-300"
+                    }`}>
+                      {isChecked && <span className="text-[9px] font-bold">✓</span>}
+                    </div>
+                    <span className="truncate">{opt}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SKUList() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("All");
-  const [selectedStatus, setSelectedStatus] = useState<string>("All");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [selectedAssortment, setSelectedAssortment] = useState<string>("All");
-  const [selectedSegment, setSelectedSegment] = useState<string>("All");
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedAssortments, setSelectedAssortments] = useState<string[]>([]);
+  const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
   
   // Sorting state
   const [sortField, setSortField] = useState<keyof SKUData>("productCode");
@@ -271,7 +385,7 @@ export function SKUList() {
         }
       }
     } catch (e) {
-      console.error("Failed to load local storage SKU database, using static fallback:", e);
+      console.log("Failed to load local storage SKU database, using static fallback:", e);
     }
     return []; // Start empty so there is no simulation data loaded before sheet sync!
   });
@@ -394,7 +508,7 @@ export function SKUList() {
       
       // If we got a status error, or if it has Vercel connection/CORS issues, fallback to direct fetch
       if (!response.ok) {
-        console.warn(`[Proxy Warning] Direct proxy returned status ${response.status}. Trying direct browser fetch.`);
+        console.log(`[Proxy Warning] Direct proxy returned status ${response.status}. Trying direct browser fetch.`);
         response = await fetch(defaultUrl);
       }
       
@@ -458,7 +572,7 @@ export function SKUList() {
         setSyncMessage("");
       }, 4500);
     } catch (err: any) {
-      console.error(err);
+      console.log(err);
       setSyncStatus("error");
       setSyncMessage(err.message || "Gagal menyinkronkan data.");
     } finally {
@@ -478,11 +592,11 @@ export function SKUList() {
 
   // Extract unique filter values for dropdowns based on active data
   const filterOptions = useMemo(() => {
-    const brands = ["All", ...Array.from(new Set(skuList.map(item => item.brand || "Skintific").filter(Boolean)))];
-    const statuses = ["All", ...Array.from(new Set(skuList.map(item => item.status)))];
-    const categories = ["All", ...Array.from(new Set(skuList.map(item => item.category)))];
-    const assortments = ["All", ...Array.from(new Set(skuList.map(item => item.assortment)))];
-    const segments = ["All", ...Array.from(new Set(skuList.map(item => item.segment)))];
+    const brands = Array.from(new Set(skuList.map(item => item.brand || "Skintific").filter(Boolean)));
+    const statuses = Array.from(new Set(skuList.map(item => item.status).filter(Boolean)));
+    const categories = Array.from(new Set(skuList.map(item => item.category).filter(Boolean)));
+    const assortments = Array.from(new Set(skuList.map(item => item.assortment).filter(Boolean)));
+    const segments = Array.from(new Set(skuList.map(item => item.segment).filter(Boolean)));
     return { brands, statuses, categories, assortments, segments };
   }, [skuList]);
 
@@ -514,15 +628,15 @@ export function SKUList() {
         item.subsegment.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.brand && item.brand.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchBrand = selectedBrand === "All" || item.brand === selectedBrand;
-      const matchStatus = selectedStatus === "All" || item.status === selectedStatus;
-      const matchCategory = selectedCategory === "All" || item.category === selectedCategory;
-      const matchAssortment = selectedAssortment === "All" || item.assortment === selectedAssortment;
-      const matchSegment = selectedSegment === "All" || item.segment === selectedSegment;
+      const matchBrand = selectedBrands.length === 0 || (item.brand && selectedBrands.includes(item.brand));
+      const matchStatus = selectedStatuses.length === 0 || (item.status && selectedStatuses.includes(item.status));
+      const matchCategory = selectedCategories.length === 0 || (item.category && selectedCategories.includes(item.category));
+      const matchAssortment = selectedAssortments.length === 0 || (item.assortment && selectedAssortments.includes(item.assortment));
+      const matchSegment = selectedSegments.length === 0 || (item.segment && selectedSegments.includes(item.segment));
 
       return matchSearch && matchBrand && matchStatus && matchCategory && matchAssortment && matchSegment;
     });
-  }, [skuList, searchTerm, selectedBrand, selectedStatus, selectedCategory, selectedAssortment, selectedSegment]);
+  }, [skuList, searchTerm, selectedBrands, selectedStatuses, selectedCategories, selectedAssortments, selectedSegments]);
 
   // Sort logic
   const sortedSKUs = useMemo(() => {
@@ -577,7 +691,7 @@ export function SKUList() {
         
         // Dynamic fallback in case proxy is unreachable or Vercel static router returns non-200
         if (!res.ok) {
-          console.warn(`[AutoSync Proxy Warning] HTTP ${res.status}. Falling back to direct Apps Script fetch.`);
+          console.log(`[AutoSync Proxy Warning] HTTP ${res.status}. Falling back to direct Apps Script fetch.`);
           res = await fetch(targetUrl);
         }
 
@@ -622,7 +736,7 @@ export function SKUList() {
           throw new Error("Format respon tidak dikenal atau tidak bisa dimapping.");
         }
       } catch (err: any) {
-        console.warn("[AutoSync Mount Warning] Could not auto-sync:", err);
+        console.log("[AutoSync Mount Warning] Could not auto-sync:", err);
         if (active) {
           setSyncStatus("error");
           setSyncMessage("Gagal live sync otomatis dengan Google Sheets.");
@@ -755,10 +869,10 @@ export function SKUList() {
           <button
             onClick={exportToExcel}
             disabled={filteredSKUs.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-600 font-bold text-[10px] tracking-widest uppercase border border-slate-200 hover:border-blue-400 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-xs font-bold text-white rounded-xl hover:bg-blue-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            Export Excel ({filteredSKUs.length})
+            <Download size={14} />
+            Export Excel
           </button>
         </div>
       </header>
@@ -1055,109 +1169,69 @@ function doGet(e) {
 
         {/* Second Row of Filters: Brand, Category, Assortment, Segment & Status dropdowns */}
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-1">
-          {/* Brand Dropdown */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 block">
-              Product Brand
-            </label>
-            <select
-              value={selectedBrand}
-              onChange={(e) => {
-                setSelectedBrand(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-bold bg-slate-50 hover:bg-white border border-slate-200 hover:shadow-sm rounded-xl px-4 py-2.5 text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all cursor-pointer"
-            >
-              <option value="All">All Brands</option>
-              {filterOptions.brands.filter(b => b !== "All").map(brand => (
-                <option key={brand} value={brand}>{brand}</option>
-              ))}
-            </select>
-          </div>
+          {/* Brand Filter */}
+          <MultiSelect
+            label="Product Brand"
+            options={filterOptions.brands}
+            selected={selectedBrands}
+            onChange={(selected) => {
+              setSelectedBrands(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Brand"
+          />
 
-          {/* Category Dropdown */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 block">
-              Product Category
-            </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-bold bg-slate-50 hover:bg-white border border-slate-200 hover:shadow-sm rounded-xl px-4 py-2.5 text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all cursor-pointer"
-            >
-              <option value="All">All Categories</option>
-              {filterOptions.categories.filter(cat => cat !== "All").map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
+          {/* Category Filter */}
+          <MultiSelect
+            label="Product Category"
+            options={filterOptions.categories}
+            selected={selectedCategories}
+            onChange={(selected) => {
+              setSelectedCategories(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Category"
+          />
 
-          {/* Assortment Dropdown */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 block">
-              Segment Assortment
-            </label>
-            <select
-              value={selectedAssortment}
-              onChange={(e) => {
-                setSelectedAssortment(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-bold bg-slate-50 hover:bg-white border border-slate-200 hover:shadow-sm rounded-xl px-4 py-2.5 text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all cursor-pointer"
-            >
-              <option value="All">All Assortments</option>
-              {filterOptions.assortments.filter(a => a !== "All").map(assort => (
-                <option key={assort} value={assort}>{assort}</option>
-              ))}
-            </select>
-          </div>
+          {/* Assortment Filter */}
+          <MultiSelect
+            label="Segment Assortment"
+            options={filterOptions.assortments}
+            selected={selectedAssortments}
+            onChange={(selected) => {
+              setSelectedAssortments(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Assortment"
+          />
 
-          {/* Segment Dropdown */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 block">
-              Application Segment
-            </label>
-            <select
-              value={selectedSegment}
-              onChange={(e) => {
-                setSelectedSegment(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-bold bg-slate-50 hover:bg-white border border-slate-200 hover:shadow-sm rounded-xl px-4 py-2.5 text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all cursor-pointer"
-            >
-              <option value="All">All Segments</option>
-              {filterOptions.segments.filter(s => s !== "All").map(seg => (
-                <option key={seg} value={seg}>{seg}</option>
-              ))}
-            </select>
-          </div>
+          {/* Segment Filter */}
+          <MultiSelect
+            label="Application Segment"
+            options={filterOptions.segments}
+            selected={selectedSegments}
+            onChange={(selected) => {
+              setSelectedSegments(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Segment"
+          />
 
-          {/* Status Dropdown */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] ml-1 block">
-              Release Status
-            </label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full text-xs font-bold bg-slate-50 hover:bg-white border border-slate-200 hover:shadow-sm rounded-xl px-4 py-2.5 text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all cursor-pointer"
-            >
-              <option value="All">All Statuses</option>
-              {filterOptions.statuses.filter(st => st !== "All").map(st => (
-                <option key={st} value={st}>{st}</option>
-              ))}
-            </select>
-          </div>
+          {/* Status Filter */}
+          <MultiSelect
+            label="Release Status"
+            options={filterOptions.statuses}
+            selected={selectedStatuses}
+            onChange={(selected) => {
+              setSelectedStatuses(selected);
+              setCurrentPage(1);
+            }}
+            placeholder="Status"
+          />
         </div>
 
         {/* Filters Reset Panel */}
-        {(searchTerm || selectedBrand !== "All" || selectedStatus !== "All" || selectedCategory !== "All" || selectedAssortment !== "All" || selectedSegment !== "All") && (
+        {(searchTerm || selectedBrands.length > 0 || selectedStatuses.length > 0 || selectedCategories.length > 0 || selectedAssortments.length > 0 || selectedSegments.length > 0) && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-500 border-t border-slate-50 pt-3">
             <div className="flex items-center gap-2">
               <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -1166,11 +1240,11 @@ function doGet(e) {
             <button
               onClick={() => {
                 setSearchTerm("");
-                setSelectedBrand("All");
-                setSelectedStatus("All");
-                setSelectedCategory("All");
-                setSelectedAssortment("All");
-                setSelectedSegment("All");
+                setSelectedBrands([]);
+                setSelectedStatuses([]);
+                setSelectedCategories([]);
+                setSelectedAssortments([]);
+                setSelectedSegments([]);
                 setCurrentPage(1);
               }}
               className="flex items-center gap-2 group cursor-pointer"

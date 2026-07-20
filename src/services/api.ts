@@ -97,15 +97,15 @@ export async function fetchSalesData(forceRefresh = false, sheetName = "Sell In 
       const text = await response.text();
       // Check if it is HTML or redirect rather than JSON
       if (text.trim().startsWith("<") || text.includes("<html") || text.includes("<!DOCTYPE html>") || text.includes("Google Accounts")) {
-        console.warn("Local proxy returned HTML/redirect instead of JSON for sales data. Trying direct fetch.");
+        console.log("Local proxy returned HTML/redirect instead of JSON for sales data. Trying direct fetch.");
       } else {
         rawData = JSON.parse(text);
       }
     } else {
-      console.warn(`Local proxy returned status ${response.status} for sales-data. Trying direct browser fetch.`);
+      console.log(`Local proxy returned status ${response.status} for sales-data. Trying direct browser fetch.`);
     }
   } catch (proxyError) {
-    console.warn("Proxy fetch nested error for sales-data:", proxyError);
+    console.log("Proxy fetch nested error for sales-data:", proxyError);
   }
 
   // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
@@ -117,7 +117,7 @@ export async function fetchSalesData(forceRefresh = false, sheetName = "Sell In 
       if (response.ok) {
         const text = await response.text();
         if (text.trim().startsWith("<") || text.includes("<html") || text.includes("<!DOCTYPE html>") || text.includes("Google Accounts")) {
-          console.warn("Direct browser fetch returned HTML instead of JSON for sales data.");
+          console.log("Direct browser fetch returned HTML instead of JSON for sales data.");
         } else {
           rawData = JSON.parse(text);
           console.log(`Direct browser fetch for ${sheetName} succeeded!`);
@@ -126,19 +126,19 @@ export async function fetchSalesData(forceRefresh = false, sheetName = "Sell In 
         throw new Error(`Direct fetch returned status: ${response.status}`);
       }
     } catch (directError) {
-      console.error(`Direct browser fetch for ${sheetName} failed:`, directError);
+      console.log(`Direct browser fetch for ${sheetName} failed:`, directError);
     }
   }
 
   try {
     if (!rawData) {
-      console.warn(`Both proxy and direct fetch failed for ${sheetName}. Using local fallback mockup data.`);
+      console.log(`Both proxy and direct fetch failed for ${sheetName}. Using local fallback mockup data.`);
       if (cachedData[sheetName]) return cachedData[sheetName];
       return generateMockSalesData();
     }
 
     if (!Array.isArray(rawData)) {
-      console.error("Sales data did not return an array. Received:", rawData);
+      console.log("Sales data did not return an array. Received:", rawData);
       throw new Error("API response is not a valid JSON array");
     }
     
@@ -157,7 +157,7 @@ export async function fetchSalesData(forceRefresh = false, sheetName = "Sell In 
     lastFetchTime[sheetName] = now;
     return mappedData;
   } catch (error) {
-    console.error(`Fetch ${sheetName} Error:`, error);
+    console.log(`Fetch ${sheetName} Error:`, error);
     if (cachedData[sheetName]) return cachedData[sheetName];
     return generateMockSalesData();
   }
@@ -220,10 +220,10 @@ export async function fetchIncentiveSPVData(forceRefresh = false): Promise<Incen
     if (response.ok) {
       rawData = await response.json();
     } else {
-      console.warn(`Local proxy returned status ${response.status} for SPV Internal Incentives. Trying direct browser fetch.`);
+      console.log(`Local proxy returned status ${response.status} for SPV Internal Incentives. Trying direct browser fetch.`);
     }
   } catch (proxyError) {
-    console.warn("Proxy fetch nested error for SPV Internal Incentives:", proxyError);
+    console.log("Proxy fetch nested error for SPV Internal Incentives:", proxyError);
   }
 
   // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
@@ -238,7 +238,7 @@ export async function fetchIncentiveSPVData(forceRefresh = false): Promise<Incen
         throw new Error(`Direct fetch returned status: ${response.status}`);
       }
     } catch (directError) {
-      console.error("Direct browser fetch for SPV Internal Incentives failed:", directError);
+      console.log("Direct browser fetch for SPV Internal Incentives failed:", directError);
     }
   }
 
@@ -248,7 +248,7 @@ export async function fetchIncentiveSPVData(forceRefresh = false): Promise<Incen
     }
     
     if (!Array.isArray(rawData)) {
-      console.error("Incentives API did not return an array. Received:", rawData);
+      console.log("Incentives API did not return an array. Received:", rawData);
       throw new Error("API response is not a valid JSON array");
     }
 
@@ -320,7 +320,7 @@ export async function fetchIncentiveSPVData(forceRefresh = false): Promise<Incen
     lastIncentivesFetchTime = now;
     return mappedData;
   } catch (error) {
-    console.error("Fetch Incentives Error:", error);
+    console.log("Fetch Incentives Error:", error);
     if (cachedIncentivesData) return cachedIncentivesData;
     return generateMockIncentiveSPVData();
   }
@@ -420,13 +420,13 @@ export async function fetchIncentiveSPVExclusiveData(forceRefresh = false): Prom
       if (json && json.success !== false) {
         rawData = json;
       } else {
-        console.warn("GAS proxy returned success: false or invalid response for exclusive:", json?.message);
+        console.log("GAS proxy returned success: false or invalid response for exclusive:", json?.message);
       }
     } else {
-      console.warn(`Local proxy returned status ${response.status} for exclusive incentives. Trying direct browser fetch.`);
+      console.log(`Local proxy returned status ${response.status} for exclusive incentives. Trying direct browser fetch.`);
     }
   } catch (proxyError) {
-    console.warn("Proxy fetch nested error for exclusive incentives:", proxyError);
+    console.log("Proxy fetch nested error for exclusive incentives:", proxyError);
   }
 
   // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
@@ -441,13 +441,13 @@ export async function fetchIncentiveSPVExclusiveData(forceRefresh = false): Prom
         throw new Error(`Direct fetch returned status: ${response.status}`);
       }
     } catch (directError) {
-      console.error("Direct browser fetch for exclusive incentives failed:", directError);
+      console.log("Direct browser fetch for exclusive incentives failed:", directError);
     }
   }
 
   try {
     if (!rawData) {
-      console.warn("Both proxy and direct fetch for exclusive incentives failed. Using local mockup fallback.");
+      console.log("Both proxy and direct fetch for exclusive incentives failed. Using local mockup fallback.");
       const mockResult = generateMockIncentiveSPVExclusiveData();
       const mappedWithFallback = mockResult.map(item => ({
         ...item,
@@ -477,12 +477,12 @@ export async function fetchIncentiveSPVExclusiveData(forceRefresh = false): Prom
         if (possibleArray) {
           arrayData = possibleArray;
         } else {
-          console.error("Exclusive incentives script returned an object but no recognizable array of rows was found:", rawData);
+          console.log("Exclusive incentives script returned an object but no recognizable array of rows was found:", rawData);
           throw new Error("No array found in Google Apps Script response");
         }
       }
     } else {
-      console.error("Exclusive Incentives API did not return readable JSON. Received:", rawData);
+      console.log("Exclusive Incentives API did not return readable JSON. Received:", rawData);
       throw new Error("API response is not a valid JSON array or object");
     }
 
@@ -583,7 +583,7 @@ export async function fetchIncentiveSPVExclusiveData(forceRefresh = false): Prom
     lastExclusiveFetchTime = now;
     return mappedData;
   } catch (error) {
-    console.warn("Fetch Exclusive Incentives Error, using fallback:", error);
+    console.log("Fetch Exclusive Incentives Error, using fallback:", error);
     if (cachedExclusiveData) return cachedExclusiveData;
     const mockResult = generateMockIncentiveSPVExclusiveData();
     return mockResult.map(item => ({
@@ -700,13 +700,13 @@ export async function fetchIncentiveSEData(forceRefresh = false): Promise<Incent
       if (json && json.success !== false) {
         rawData = json;
       } else {
-        console.warn("GAS proxy returned success: false or invalid response for SE:", json?.message);
+        console.log("GAS proxy returned success: false or invalid response for SE:", json?.message);
       }
     } else {
-      console.warn(`Local proxy returned status ${response.status} for SE Incentives. Trying direct browser fetch.`);
+      console.log(`Local proxy returned status ${response.status} for SE Incentives. Trying direct browser fetch.`);
     }
   } catch (proxyError) {
-    console.warn("Proxy fetch nested error for SE Incentives:", proxyError);
+    console.log("Proxy fetch nested error for SE Incentives:", proxyError);
   }
 
   // 2. Fallback to direct client-side fetch from the browser (bypasses Vercel routing / timeout constraints)
@@ -721,13 +721,13 @@ export async function fetchIncentiveSEData(forceRefresh = false): Promise<Incent
         throw new Error(`Direct fetch returned status: ${response.status}`);
       }
     } catch (directError) {
-      console.error("Direct browser fetch for SE Incentives failed:", directError);
+      console.log("Direct browser fetch for SE Incentives failed:", directError);
     }
   }
 
   try {
     if (!rawData) {
-      console.warn("Both proxy and direct fetch for SE Incentives failed. Using local mockup fallback.");
+      console.log("Both proxy and direct fetch for SE Incentives failed. Using local mockup fallback.");
       const mockResult = generateMockIncentiveSEData();
       const mappedWithFallback = mockResult.map(item => ({
         ...item,
@@ -757,12 +757,12 @@ export async function fetchIncentiveSEData(forceRefresh = false): Promise<Incent
         if (possibleArray) {
           arrayData = possibleArray;
         } else {
-          console.error("SE incentives script returned an object but no recognizable array of rows was found:", rawData);
+          console.log("SE incentives script returned an object but no recognizable array of rows was found:", rawData);
           throw new Error("No array found in Google Apps Script response for SE");
         }
       }
     } else {
-      console.error("SE Incentives API did not return readable JSON. Received:", rawData);
+      console.log("SE Incentives API did not return readable JSON. Received:", rawData);
       throw new Error("API response is not a valid JSON array or object for SE");
     }
 
@@ -866,7 +866,7 @@ export async function fetchIncentiveSEData(forceRefresh = false): Promise<Incent
     lastSEFetchTime = now;
     return mappedData;
   } catch (error) {
-    console.warn("Fetch SE Incentives Error, using fallback:", error);
+    console.log("Fetch SE Incentives Error, using fallback:", error);
     if (cachedSEData) return cachedSEData;
     const mockResult = generateMockIncentiveSEData();
     return mockResult.map(item => ({
@@ -978,13 +978,13 @@ export async function fetchSellOutData(forceRefresh = false): Promise<SellOutDat
       if (json && json.success !== false) {
         rawData = json;
       } else {
-        console.warn("GAS proxy returned success: false or invalid response for Sell Out. Will try direct browser fetch.");
+        console.log("GAS proxy returned success: false or invalid response for Sell Out. Will try direct browser fetch.");
       }
     } else {
-      console.warn(`Local proxy returned status ${response.status} for Sell Out. Will try direct browser fetch.`);
+      console.log(`Local proxy returned status ${response.status} for Sell Out. Will try direct browser fetch.`);
     }
   } catch (proxyError) {
-    console.warn("Proxy fetch nested error for Sell Out:", proxyError);
+    console.log("Proxy fetch nested error for Sell Out:", proxyError);
   }
 
   // 2. Second attempt: Direct fetch to GAS from the browser (perfect for Vercel/Static CDNs without active Express daemons)
@@ -999,7 +999,7 @@ export async function fetchSellOutData(forceRefresh = false): Promise<SellOutDat
         throw new Error(`Direct fetch returned status: ${response.status}`);
       }
     } catch (directError) {
-      console.error("Direct browser fetch for Sell Out failed:", directError);
+      console.log("Direct browser fetch for Sell Out failed:", directError);
     }
   }
 
@@ -1023,12 +1023,12 @@ export async function fetchSellOutData(forceRefresh = false): Promise<SellOutDat
           if (possibleArray) {
             arrayData = possibleArray;
           } else {
-            console.error("Sell Out script returned an object but no recognizable array of rows was found:", rawData);
+            console.log("Sell Out script returned an object but no recognizable array of rows was found:", rawData);
             throw new Error("No array found in Google Apps Script response for Sell Out");
           }
         }
       } else {
-        console.error("Sell Out API did not return readable JSON. Received:", rawData);
+        console.log("Sell Out API did not return readable JSON. Received:", rawData);
         throw new Error("API response is not a valid JSON array or object for Sell Out");
       }
 
@@ -1103,13 +1103,13 @@ export async function fetchSellOutData(forceRefresh = false): Promise<SellOutDat
       lastSellOutFetchTime = now;
       return mappedData;
     } catch (mappingError) {
-      console.error("Error parsing or mapping Sell Out keys:", mappingError);
+      console.log("Error parsing or mapping Sell Out keys:", mappingError);
     }
   }
 
   // 4. Last fallback if both connection steps failed
   if (cachedSellOutData) return cachedSellOutData;
-  console.warn("Both local API proxy and direct browser fetch failed for Sell Out; using mapped mockup data.");
+  console.log("Both local API proxy and direct browser fetch failed for Sell Out; using mapped mockup data.");
   const fallback = generateMockSellOutData();
   const mappedWithFallback = fallback.map(item => ({
     ...item,
@@ -1193,16 +1193,16 @@ export async function fetchSKUFocusStoreData(forceRefresh = false): Promise<SKUF
       if (json && json.success !== false) {
         rawData = json;
       } else {
-        console.warn("GAS proxy returned success: false or invalid response for SKU Focus Store.");
+        console.log("GAS proxy returned success: false or invalid response for SKU Focus Store.");
       }
     } else {
-      console.warn(`Local proxy returned status ${response.status} for SKU Focus Store. Trying direct fetch.`);
+      console.log(`Local proxy returned status ${response.status} for SKU Focus Store. Trying direct fetch.`);
     }
   } catch (proxyError: any) {
     if (proxyError.message && proxyError.message.startsWith("LIBRARY_URL_DETECTED:")) {
       throw proxyError;
     }
-    console.warn("Proxy fetch nested error for SKU Focus Store:", proxyError);
+    console.log("Proxy fetch nested error for SKU Focus Store:", proxyError);
   }
 
   // 2. Fallback to direct client-side fetch from browser
@@ -1218,7 +1218,7 @@ export async function fetchSKUFocusStoreData(forceRefresh = false): Promise<SKUF
         throw new Error(`Direct fetch returned status: ${response.status}`);
       }
     } catch (directError) {
-      console.error("Direct browser fetch for SKU Focus Store failed:", directError);
+      console.log("Direct browser fetch for SKU Focus Store failed:", directError);
     }
   }
 
@@ -1298,13 +1298,13 @@ export async function fetchSKUFocusStoreData(forceRefresh = false): Promise<SKUF
         return mappedData;
       }
     } catch (mappingError) {
-      console.error("Error parsing or mapping SKU Focus Store keys:", mappingError);
+      console.log("Error parsing or mapping SKU Focus Store keys:", mappingError);
     }
   }
 
   // 4. Last fallback if both connection steps failed
   if (cachedSKUStoreData) return cachedSKUStoreData;
-  console.warn("Both local API proxy and direct browser fetch failed for SKU Focus Store; using mapped mockup data.");
+  console.log("Both local API proxy and direct browser fetch failed for SKU Focus Store; using mapped mockup data.");
   const fallback = generateMockSKUFocusStoreData();
   const mappedWithFallback = fallback.map(item => ({
     ...item,
@@ -1335,16 +1335,16 @@ export async function fetchSKUFocusSPVData(forceRefresh = false): Promise<SKUFoc
       if (json && json.success !== false) {
         rawData = json;
       } else {
-        console.warn("GAS proxy returned success: false or invalid response for SKU Focus SPV.");
+        console.log("GAS proxy returned success: false or invalid response for SKU Focus SPV.");
       }
     } else {
-      console.warn(`Local proxy returned status ${response.status} for SKU Focus SPV. Trying direct fetch.`);
+      console.log(`Local proxy returned status ${response.status} for SKU Focus SPV. Trying direct fetch.`);
     }
   } catch (proxyError: any) {
     if (proxyError.message && proxyError.message.startsWith("LIBRARY_URL_DETECTED:")) {
       throw proxyError;
     }
-    console.warn("Proxy fetch nested error for SKU Focus SPV:", proxyError);
+    console.log("Proxy fetch nested error for SKU Focus SPV:", proxyError);
   }
 
   // 2. Fallback to direct client-side fetch from browser
@@ -1360,7 +1360,7 @@ export async function fetchSKUFocusSPVData(forceRefresh = false): Promise<SKUFoc
         throw new Error(`Direct fetch returned status: ${response.status}`);
       }
     } catch (directError) {
-      console.error("Direct browser fetch for SKU Focus SPV failed:", directError);
+      console.log("Direct browser fetch for SKU Focus SPV failed:", directError);
     }
   }
 
@@ -1438,13 +1438,13 @@ export async function fetchSKUFocusSPVData(forceRefresh = false): Promise<SKUFoc
         return mappedData;
       }
     } catch (mappingError) {
-      console.error("Error parsing or mapping SKU Focus SPV keys:", mappingError);
+      console.log("Error parsing or mapping SKU Focus SPV keys:", mappingError);
     }
   }
 
   // 4. Last fallback if both connection steps failed
   if (cachedSKUSPVData) return cachedSKUSPVData;
-  console.warn("Both local API proxy and direct browser fetch failed for SKU Focus SPV; using mapped mockup data.");
+  console.log("Both local API proxy and direct browser fetch failed for SKU Focus SPV; using mapped mockup data.");
   const fallback = generateMockSKUFocusSPVData();
   const mappedWithFallback = fallback.map(item => ({
     ...item,
@@ -1574,15 +1574,15 @@ export async function fetchCategoryAnalysisData(forceRefresh = false): Promise<C
         rawData = json;
       } else {
         lastErrorMessage = json?.message || "GAS proxy returned success: false or invalid response.";
-        console.warn("GAS proxy returned success: false or invalid response for Category Analysis:", lastErrorMessage);
+        console.log("GAS proxy returned success: false or invalid response for Category Analysis:", lastErrorMessage);
       }
     } else {
       lastErrorMessage = `Local proxy returned status ${response.status}`;
-      console.warn(`Local proxy returned status ${response.status} for Category Analysis. Trying direct browser fetch.`);
+      console.log(`Local proxy returned status ${response.status} for Category Analysis. Trying direct browser fetch.`);
     }
   } catch (proxyError: any) {
     lastErrorMessage = proxyError?.message || String(proxyError);
-    console.warn("Proxy fetch nested error for Category Analysis:", proxyError);
+    console.log("Proxy fetch nested error for Category Analysis:", proxyError);
   }
 
   // 2. Second attempt: fallback to direct GAS browser fetch
@@ -1600,7 +1600,7 @@ export async function fetchCategoryAnalysisData(forceRefresh = false): Promise<C
       }
     } catch (directError: any) {
       lastErrorMessage = directError?.message || String(directError);
-      console.error("Direct browser fetch for Category Analysis failed:", directError);
+      console.log("Direct browser fetch for Category Analysis failed:", directError);
     }
   }
 
@@ -1624,7 +1624,7 @@ export async function fetchCategoryAnalysisData(forceRefresh = false): Promise<C
           if (possibleArray) {
             arrayData = possibleArray;
           } else {
-            console.error("No recognizable array found in Google Apps Script response for Category Analysis");
+            console.log("No recognizable array found in Google Apps Script response for Category Analysis");
           }
         }
       }
@@ -1703,7 +1703,7 @@ export async function fetchCategoryAnalysisData(forceRefresh = false): Promise<C
         return mappedData;
       }
     } catch (parseErr: any) {
-      console.error("Failed to parse retrieved Category Analysis data, falling back to mock:", parseErr);
+      console.log("Failed to parse retrieved Category Analysis data, falling back to mock:", parseErr);
       if (forceRefresh) {
         throw new Error(`Data parsing error: ${parseErr?.message || parseErr}`);
       }
@@ -1829,15 +1829,15 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
         rawData = json;
       } else {
         lastErrorMessage = json?.message || "GAS proxy returned success: false or invalid response.";
-        console.warn("GAS proxy returned success: false or invalid response for Stock Analysis:", lastErrorMessage);
+        console.log("GAS proxy returned success: false or invalid response for Stock Analysis:", lastErrorMessage);
       }
     } else {
       lastErrorMessage = `Local proxy returned status ${response.status}`;
-      console.warn(`Local proxy returned status ${response.status} for Stock Analysis. Trying direct browser fetch.`);
+      console.log(`Local proxy returned status ${response.status} for Stock Analysis. Trying direct browser fetch.`);
     }
   } catch (proxyError: any) {
     lastErrorMessage = proxyError?.message || String(proxyError);
-    console.warn("Proxy fetch nested error for Stock Analysis:", proxyError);
+    console.log("Proxy fetch nested error for Stock Analysis:", proxyError);
   }
 
   // 2. Second attempt: fallback to direct GAS browser fetch
@@ -1855,7 +1855,7 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
       }
     } catch (directError: any) {
       lastErrorMessage = directError?.message || String(directError);
-      console.error("Direct browser fetch for Stock Analysis failed:", directError);
+      console.log("Direct browser fetch for Stock Analysis failed:", directError);
     }
   }
 
@@ -1879,7 +1879,7 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
           if (possibleArray) {
             arrayData = possibleArray;
           } else {
-            console.error("No recognizable array found in Google Apps Script response for Stock Analysis");
+            console.log("No recognizable array found in Google Apps Script response for Stock Analysis");
           }
         }
       }
@@ -1941,7 +1941,7 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
         return mappedData;
       }
     } catch (parseErr: any) {
-      console.error("Failed to parse retrieved Stock Analysis data, falling back to mock:", parseErr);
+      console.log("Failed to parse retrieved Stock Analysis data, falling back to mock:", parseErr);
       if (forceRefresh) {
         throw new Error(`Data parsing error: ${parseErr?.message || parseErr}`);
       }

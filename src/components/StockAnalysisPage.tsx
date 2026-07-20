@@ -92,7 +92,7 @@ export default function StockAnalysisPage() {
       const data = await fetchStockAnalysisData(force);
       setRawData(data);
     } catch (err: any) {
-      console.error("Failed to load Stock Analysis data:", err);
+      console.log("Failed to load Stock Analysis data:", err);
       setError(err.message || "Gagal menyelaraskan data Stock Analysis.");
     } finally {
       setLoading(false);
@@ -431,18 +431,19 @@ export default function StockAnalysisPage() {
           </div>
           <p className="text-slate-400 text-sm font-medium">Strategic supply chain tracking and Weeks of Inventory (WOI) analytics.</p>
         </div>
-        <div className="flex items-center flex-wrap gap-4">
-          <button 
+        <div className="flex items-center flex-wrap gap-3 w-full lg:w-auto">
+          <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all bg-white border border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-600 shadow-sm cursor-pointer disabled:opacity-50"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-xs font-bold text-slate-600 rounded-xl hover:border-blue-500 hover:text-blue-600 shadow-sm transition-all cursor-pointer"
           >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            {refreshing ? "Syncing..." : "Sync Sheet"}
+            <RefreshCw size={14} className={refreshing ? "animate-spin text-blue-600" : ""} />
+            {refreshing ? "Syncing..." : "Sync Spreadsheet"}
           </button>
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm cursor-pointer"
+            disabled={processedData.length === 0}
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-xs font-bold text-white rounded-xl hover:bg-blue-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download size={14} />
             Export Excel

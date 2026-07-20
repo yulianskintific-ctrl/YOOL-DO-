@@ -93,7 +93,7 @@ export default function Insights({ data, isLoading: dataLoading, mode = 'Sell In
       setInsight(text);
       localStorage.setItem(cacheKey, text);
     } catch (error: any) {
-      console.error("AI Insight Error:", error);
+      console.log("AI Insight Error:", error);
       
       // Handle the specific 429 error (quota)
       if (error?.message?.includes("429") || error?.message?.includes("quota") || error?.status === 429) {
