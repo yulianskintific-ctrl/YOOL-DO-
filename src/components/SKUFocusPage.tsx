@@ -392,7 +392,12 @@ function doGet(e) {
           <button 
             onClick={handleManualSync}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-blue-800 hover:bg-blue-900 text-white shadow-md hover:shadow-lg transition-all"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+              refreshing 
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
+                : "bg-white border border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-600 shadow-sm cursor-pointer"
+            )}
           >
             <RefreshCw size={14} className={cn(refreshing && "animate-spin")} />
             {refreshing ? "Syncing..." : "Sync Now"}

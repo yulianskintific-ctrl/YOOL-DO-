@@ -856,13 +856,13 @@ export function SKUList() {
           <button
             onClick={handleSync}
             disabled={isSyncing}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-bold text-[10px] tracking-widest uppercase transition-all shadow-sm cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
               isSyncing
-                ? "bg-amber-500 text-white border-amber-500 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                : "bg-white border border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-600 shadow-sm cursor-pointer"
             }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
             {isSyncing ? "Syncing..." : "Sync Now"}
           </button>
 

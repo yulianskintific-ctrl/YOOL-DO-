@@ -2,5 +2,7 @@
   "name": "Step by Step: YOOL-DO Dashboard",
   "description": "Professional sales performance dashboard with Google Sheets integration and AI insights.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

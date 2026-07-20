@@ -435,9 +435,13 @@ export default function StockAnalysisPage() {
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-xs font-bold text-slate-600 rounded-xl hover:border-blue-500 hover:text-blue-600 shadow-sm transition-all cursor-pointer"
+            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
+              refreshing
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                : "bg-white border border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-600 shadow-sm cursor-pointer"
+            }`}
           >
-            <RefreshCw size={14} className={refreshing ? "animate-spin text-blue-600" : ""} />
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             {refreshing ? "Syncing..." : "Sync Spreadsheet"}
           </button>
           <button

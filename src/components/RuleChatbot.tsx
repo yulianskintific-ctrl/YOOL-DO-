@@ -18,13 +18,13 @@ export default function RuleChatbot() {
     {
       id: "welcome",
       sender: "bot",
-      text: "Halo! Saya **Yool-Bot**, asisten virtual pintar Anda untuk platform **YOOL-DO!**.\n\nSilakan tanyakan hal-hal seputar dashboard kepada ahlinya!",
+      text: "Halo! Saya **Yool-Yool**, asisten virtual pintar Anda untuk **YOOL-DO!**.\n\nSilakan tanyakan hal-hal seputar dashboard, analisis penjualan, rumus insentif, atau kendala teknis kepada saya! Serahkan kepada ahlinya ya!",
       timestamp: new Date(),
       quickReplies: [
-        { text: "📊 Rumus Insentif SPV", query: "spv" },
-        { text: "⭐ Rumus Insentif SE", query: "se" },
-        { text: "🔄 Cara Atasi Error 403 / Sync", query: "sync" },
-        { text: "💡 Apa beda Sell In/Through/Out?", query: "sell" }
+        { text: "📊 Rumus Insentif SPV", query: "Tolong jelaskan bagaimana Rumus Insentif SPV (Supervisor) dihitung." },
+        { text: "⭐ Rumus Insentif SE", query: "Tolong jelaskan bagaimana Rumus Insentif SE (Sales Executive) dihitung." },
+        { text: "🔄 Cara Atasi Error 403 / Sync", query: "Bagaimana cara mengatasi error sinkronisasi atau Error 403 Forbidden pada Google Sheets?" },
+        { text: "💡 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
       ]
     }
   ]);
@@ -39,110 +39,7 @@ export default function RuleChatbot() {
     }
   }, [messages, isTyping, isOpen]);
 
-  // Predefined Q&A Knowledge Base for Rules mode
-  const getBotResponse = (input: string): { text: string; quickReplies?: { text: string; query: string }[] } => {
-    const text = input.toLowerCase().trim();
-
-    // 1. Incentives SPV
-    if (text.includes("spv") || text.includes("internal") || text.includes("exclusive") || text.includes("insentif spv") || text.includes("supervisor")) {
-      return {
-        text: "**Rumus Insentif SPV (Supervisor) di YOOL-DO!:**\n\nSPV Incentive dihitung secara berkala berdasarkan beberapa komponen utama:\n1. **Pencapaian GMV (Gross Merchandise Value)**: Mencapai target GMV total (target vs actual) cabang.\n2. **Incentive Active Outlet (AO)**: Dihitung dari jumlah outlet aktif yang melakukan transaksi.\n3. **Incentive Must Sell List (MSL)**: Tambahan bonus untuk penyebaran produk prioritas wajib jual.\n\n*Perbedaan SPV Internal & Exclusive terletak pada jenis distributor dan otorisasi wilayah cabang yang terdaftar di sistem.*",
-        quickReplies: [
-          { text: "⭐ Rumus Insentif SE", query: "se" },
-          { text: "🔄 Cara Atasi Error Sync", query: "sync" },
-          { text: "Kembali ke Menu Utama", query: "menu" }
-        ]
-      };
-    }
-
-    // 2. Incentives SE
-    if (text.includes("se ") || text.includes(" se") || text.includes("sales executive") || text.includes("se") || text.includes("salesman") || text.includes("executive")) {
-      return {
-        text: "**Rumus Insentif SE (Sales Executive) di YOOL-DO!:**\n\nIncentive SE berfokus pada performa eksekusi sales di lapangan:\n1. **Ach GMV**: Persentase pencapaian target volume penjualan.\n2. **Ach AO**: Target keaktifan jumlah toko binaan.\n3. **Product Focus ST & AO**: Bonus tambahan jika SE berhasil menjual SKU fokus tertentu ke toko retail.\n\nData ini diperbarui berkala berdasarkan unggahan data dari Google Sheets distributor.",
-        quickReplies: [
-          { text: "📊 Rumus Insentif SPV", query: "spv" },
-          { text: "🔄 Cara Atasi Error Sync", query: "sync" },
-          { text: "Kembali ke Menu Utama", query: "menu" }
-        ]
-      };
-    }
-
-    // 3. Sync & Error 403
-    if (text.includes("sync") || text.includes("error") || text.includes("403") || text.includes("gagal") || text.includes("forbidden") || text.includes("loading") || text.includes("koneksi") || text.includes("sheet")) {
-      return {
-        text: "**Cara Mengatasi Error Sinkronisasi / Error 403 (Forbidden):**\n\nMasalah ini biasanya disebabkan oleh pembatasan hak akses (permission) pada Google Apps Script Anda. Silakan ikuti panduan berikut:\n\n1. Buka halaman **Google Apps Script** dari spreadsheet Anda.\n2. Klik tombol **Deploy** di sudut kanan atas, lalu pilih **New Deployment**.\n3. Atur konfigurasi deployment:\n   - *Execute as:* **Me (Email Anda)**\n   - *Who has access:* **Anyone** (Siapa saja / umum)\n4. Klik **Deploy** dan salin URL Web App baru yang berakhiran dengan `/exec`.\n5. Masukkan URL tersebut pada konfigurasi di dashboard Yool-Do.",
-        quickReplies: [
-          { text: "📊 Rumus Insentif SPV", query: "spv" },
-          { text: "💡 Apa beda Sell In/Through/Out?", query: "sell" },
-          { text: "Kembali ke Menu Utama", query: "menu" }
-        ]
-      };
-    }
-
-    // 4. Sell In / Sell Through / Sell Out
-    if (text.includes("sell") || text.includes("beda") || text.includes("in") || text.includes("through") || text.includes("out") || text.includes("aliran")) {
-      return {
-        text: "**Perbedaan Aliran Data Penjualan (Sales Funnel):**\n\n* **Sell In**: Penjualan barang dari **Prinsipal / Pabrik ke Distributor** (Stok masuk gudang distributor).\n* **Sell Through**: Penjualan barang dari **Distributor ke Toko / Retail / Grosir** (Stok masuk pasar ritel).\n* **Sell Out**: Penjualan barang dari **Toko langsung ke Konsumen Akhir** (Konsumsi nyata di pasar).\n\nDashboard ini memantau ketiga metrik tersebut untuk menjaga keseimbangan stok di pasar.",
-        quickReplies: [
-          { text: "🎯 Apa itu SKU Focus?", query: "sku" },
-          { text: "📦 Penjelasan Stock Analysis", query: "stock" },
-          { text: "Kembali ke Menu Utama", query: "menu" }
-        ]
-      };
-    }
-
-    // 5. Stock Analysis
-    if (text.includes("stock") || text.includes("stok") || text.includes("soh") || text.includes("death") || text.includes("woi")) {
-      return {
-        text: "**Panduan Metrik Stock Analysis:**\n\nFitur ini berfungsi memantau kesehatan persediaan stok di gudang distributor:\n* **SOH (Stock on Hand)**: Jumlah stok fisik yang tersedia saat ini di gudang.\n* **WOI (Weeks of Inventory)**: Estimasi berapa minggu stok akan habis berdasarkan rata-rata penjualan mingguan.\n* **Death Stock**: Indikator produk yang tidak mengalami penjualan sama sekali dalam 30 hari terakhir. Sebaiknya segera buat program promo untuk produk berkategori ini.",
-        quickReplies: [
-          { text: "💡 Apa beda Sell In/Through/Out?", query: "sell" },
-          { text: "🎯 Apa itu SKU Focus?", query: "sku" },
-          { text: "Kembali ke Menu Utama", query: "menu" }
-        ]
-      };
-    }
-
-    // 6. SKU Focus
-    if (text.includes("sku") || text.includes("focus") || text.includes("prioritas") || text.includes("eligible")) {
-      return {
-        text: "**Penjelasan Menu SKU Focus:**\n\nMenu **SKU Focus** melacak tingkat distribusi produk-produk unggulan/prioritas (*focus product*) ke retail. Fitur ini membantu:\n1. Mengetahui seberapa banyak toko binaan yang sudah mengorder SKU fokus tersebut.\n2. Menentukan kelayakan (*Eligibility*) distributor dalam mendapatkan bonus distribusi khusus berdasarkan pencapaian target yang ditetapkan.",
-        quickReplies: [
-          { text: "📦 Penjelasan Stock Analysis", query: "stock" },
-          { text: "💡 Apa beda Sell In/Through/Out?", query: "sell" },
-          { text: "Kembali ke Menu Utama", query: "menu" }
-        ]
-      };
-    }
-
-    // 7. Menu utama / Reset / Bantuan
-    if (text.includes("menu") || text.includes("bantuan") || text.includes("reset") || text.includes("halo") || text.includes("hi") || text.includes("pagi") || text.includes("siang") || text.includes("sore") || text.includes("malam")) {
-      return {
-        text: "Halo! Berikut adalah topik informasi populer yang dapat saya bantu jawab secara instan. Silakan pilih salah satu opsi di bawah:",
-        quickReplies: [
-          { text: "📊 Rumus Insentif SPV", query: "spv" },
-          { text: "⭐ Rumus Insentif SE", query: "se" },
-          { text: "🔄 Cara Atasi Error 403 / Sync", query: "sync" },
-          { text: "💡 Apa beda Sell In, Through & Out?", query: "sell" },
-          { text: "📦 Penjelasan Stock Analysis", query: "stock" },
-          { text: "🎯 Apa itu SKU Focus?", query: "sku" }
-        ]
-      };
-    }
-
-    // 8. Fallback / Default Response
-    return {
-      text: "Maaf, saya tidak menemukan kata kunci yang tepat untuk menjawab pertanyaan Anda.\n\nCobalah untuk mengetik dengan kata kunci yang lebih spesifik seperti **'spv'**, **'se'**, **'sync'**, **'sell'**, **'stock'**, atau **'sku'**. Atau Anda bisa mengklik opsi bantuan instan berikut ini:",
-      quickReplies: [
-        { text: "📊 Rumus Insentif SPV", query: "spv" },
-        { text: "⭐ Rumus Insentif SE", query: "se" },
-        { text: "🔄 Cara Atasi Error 403 / Sync", query: "sync" },
-        { text: "Kembali ke Menu Utama", query: "menu" }
-      ]
-    };
-  };
-
-  const handleSendMessage = (textToSend: string) => {
+  const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim()) return;
 
     // Add user message
@@ -153,23 +50,53 @@ export default function RuleChatbot() {
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInputValue("");
     setIsTyping(true);
 
-    // Simulate natural response timing delay
-    setTimeout(() => {
-      const responseData = getBotResponse(textToSend);
+    try {
+      // Connect directly to backend proxy endpoint which runs Gemini 2.5 Flash / 3.5 Flash
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          messages: updatedMessages.map(msg => ({
+            sender: msg.sender,
+            text: msg.text
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
       const botMsg: Message = {
         id: `bot-${Date.now()}`,
         sender: "bot",
-        text: responseData.text,
-        timestamp: new Date(),
-        quickReplies: responseData.quickReplies
+        text: data.text || "Gagal mendapatkan balasan dari AI.",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, botMsg]);
+    } catch (err: any) {
+      console.error("[Chatbot Gemini Failure]:", err);
+      // Friendly, professional response if connection/API is down
+      const botMsg: Message = {
+        id: `bot-${Date.now()}`,
+        sender: "bot",
+        text: "Maaf, koneksi ke asisten AI Gemini sedang bermasalah atau terputus. Mohon pastikan koneksi internet Anda stabil dan silakan coba beberapa saat lagi!",
+        timestamp: new Date()
       };
       setMessages(prev => [...prev, botMsg]);
+    } finally {
       setIsTyping(false);
-    }, 500);
+    }
   };
 
   const toggleChat = () => {
@@ -222,9 +149,9 @@ export default function RuleChatbot() {
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-800 tracking-wide">
-                    Yool-Bot
+                    Yool-Yool
                   </h3>
-                  <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wider">Asisten Virtual Dashboard</p>
+                  <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wider">Asisten Virtual Ter-🔥💥🤯!</p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
@@ -233,13 +160,13 @@ export default function RuleChatbot() {
                     {
                       id: `welcome-${Date.now()}`,
                       sender: "bot",
-                      text: "Halo! Saya **Yool-Bot**, asisten virtual pintar Anda untuk platform **YOOL-DO!**.\n\nSaya berjalan secara lokal tanpa limit kuota. Silakan tanyakan hal-hal seputar dashboard, rumus insentif, atau kendala sinkronisasi data!",
+                      text: "Halo! Saya **Yool-Yool**, asisten virtual pintar Anda untuk platform **YOOL-DO!** .\n\nSilakan tanyakan hal-hal seputar dashboard, analisis penjualan, rumus insentif, atau kendala teknis kepada saya!",
                       timestamp: new Date(),
                       quickReplies: [
-                        { text: "📊 Rumus Insentif SPV", query: "spv" },
-                        { text: "⭐ Rumus Insentif SE", query: "se" },
-                        { text: "🔄 Cara Atasi Error 403 / Sync", query: "sync" },
-                        { text: "💡 Apa beda Sell In/Through/Out?", query: "sell" }
+                        { text: "📊 Rumus Insentif SPV", query: "Tolong jelaskan bagaimana Rumus Insentif SPV (Supervisor) dihitung." },
+                        { text: "⭐ Rumus Insentif SE", query: "Tolong jelaskan bagaimana Rumus Insentif SE (Sales Executive) dihitung." },
+                        { text: "🔄 Cara Atasi Error 403 / Sync", query: "Bagaimana cara mengatasi error sinkronisasi atau Error 403 Forbidden pada Google Sheets?" },
+                        { text: "💡 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
                       ]
                     }
                   ])}
