@@ -30,7 +30,7 @@
       "destination": "https://script.google.com/macros/s/AKfycbzL5ZJpP_placeholder_skufocus/exec"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
