@@ -21,9 +21,6 @@ export default function RuleChatbot() {
       text: "Halo! Saya **Yool-Yool**, asisten virtual pintar Anda untuk **YOOL-DO!**.\n\nSilakan tanyakan hal-hal seputar dashboard, analisis penjualan, rumus insentif, atau kendala teknis kepada saya! Serahkan kepada ahlinya ya!",
       timestamp: new Date(),
       quickReplies: [
-        { text: "📊 Rumus Insentif SPV", query: "Tolong jelaskan bagaimana Rumus Insentif SPV (Supervisor) dihitung." },
-        { text: "⭐ Rumus Insentif SE", query: "Tolong jelaskan bagaimana Rumus Insentif SE (Sales Executive) dihitung." },
-        { text: "🔄 Cara Atasi Error 403 / Sync", query: "Bagaimana cara mengatasi error sinkronisasi atau Error 403 Forbidden pada Google Sheets?" },
         { text: "💡 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
       ]
     }
