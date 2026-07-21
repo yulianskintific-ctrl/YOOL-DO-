@@ -67,11 +67,16 @@ export default function RuleChatbot() {
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`Server returned status: ${response.status}`);
+      let data: any;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        // If not JSON, we'll handle it using response.ok check
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || `Server returned status: ${response.status}`);
+      }
       
       const botMsg: Message = {
         id: `bot-${Date.now()}`,
@@ -87,7 +92,7 @@ export default function RuleChatbot() {
       const botMsg: Message = {
         id: `bot-${Date.now()}`,
         sender: "bot",
-        text: "Maaf, koneksi ke asisten AI Gemini sedang bermasalah atau terputus. Mohon pastikan koneksi internet Anda stabil dan silakan coba beberapa saat lagi!",
+        text: err.message || "Maaf, koneksi ke asisten AI Gemini sedang bermasalah atau terputus. Mohon pastikan koneksi internet Anda stabil dan silakan coba beberapa saat lagi!",
         timestamp: new Date()
       };
       setMessages(prev => [...prev, botMsg]);
