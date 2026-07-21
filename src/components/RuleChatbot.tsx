@@ -266,7 +266,7 @@ export default function RuleChatbot() {
       <button
         onClick={toggleChat}
         className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-100/40 relative transition-all duration-300 transform hover:scale-105 group border border-blue-400/20 cursor-pointer"
-        title="Buka Yool-Bot Assistant"
+        title="Buka Yool Yool Assistant"
       >
         <AnimatePresence mode="wait">
           {isOpen ? (
