@@ -18,10 +18,10 @@ export default function RuleChatbot() {
     {
       id: "welcome",
       sender: "bot",
-      text: "Halo! Saya **Yool-Yool**, asisten virtual pintar Anda untuk **YOOL-DO!**.\n\nSilakan tanyakan hal-hal seputar dashboard, analisis penjualan, rumus insentif, atau kendala teknis kepada saya! Serahkan kepada ahlinya ya!",
+      text: "Hmm... Hehe, halo Kak! 😉 Saya **Yool-Yool**, asisten virtual yang akan menemani Anda menjelajahi dashboard **YOOL-DO!** ini.\n\nAda hal menarik yang ingin Anda tanyakan seputar analisis penjualan, rumus insentif, atau kendala teknis? Silakan tanyakan saja, saya siap membantu dengan beberapa trik menarik. Hehe... 🍵😏",
       timestamp: new Date(),
       quickReplies: [
-        { text: "💡 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
+        { text: "🤔 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
       ]
     }
   ]);
@@ -92,7 +92,7 @@ export default function RuleChatbot() {
       const botMsg: Message = {
         id: `bot-${Date.now()}`,
         sender: "bot",
-        text: err.message || "Maaf, koneksi ke asisten AI Gemini sedang bermasalah atau terputus. Mohon pastikan koneksi internet Anda stabil dan silakan coba beberapa saat lagi!",
+        text: err.message || "Hmm... Menarik juga, sepertinya koneksi kita sedang terhambat atau asisten AI Gemini sedang tidak bisa dijangkau. 😉🍵 Silakan periksa jaringan internet Kakak dan coba beberapa saat lagi ya.",
         timestamp: new Date()
       };
       setMessages(prev => [...prev, botMsg]);
