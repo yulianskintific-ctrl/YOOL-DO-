@@ -87,7 +87,7 @@ export default function RuleChatbot() {
       
       setMessages(prev => [...prev, botMsg]);
     } catch (err: any) {
-      console.error("[Chatbot Gemini Failure]:", err);
+      console.warn("[Chatbot Gemini Status]:", err);
       // Friendly, professional response if connection/API is down
       const botMsg: Message = {
         id: `bot-${Date.now()}`,
