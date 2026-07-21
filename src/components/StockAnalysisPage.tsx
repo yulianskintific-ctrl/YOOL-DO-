@@ -578,7 +578,7 @@ export default function StockAnalysisPage() {
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-50">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-4xl font-black tracking-tight text-slate-900 mb-1">Stock Analysis Dashboard</h2>
+            <h2 className="text-4xl font-black tracking-tight text-slate-900 mb-1">Stock Cabang Dashboard</h2>
             {isDemoMode && (
               <span className="bg-amber-100 text-amber-800 text-[9px] px-2.5 py-1 rounded-full uppercase font-black tracking-wider shadow-sm flex items-center gap-1">
                 <AlertTriangle size={11} className="text-amber-600" /> DEMO DATA

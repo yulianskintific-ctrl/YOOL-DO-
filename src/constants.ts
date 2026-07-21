@@ -27,6 +27,8 @@ export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolea
   { name: 'Sell Out', icon: ShoppingBag, isComingSoon: false },
   { name: 'Category Analysis', icon: PieChart, isComingSoon: false },
   { name: 'Stock Analysis', icon: Boxes, isComingSoon: false },
+  { name: 'Stock National', icon: Boxes, isComingSoon: true },
+  { name: 'Stock Cabang', icon: Boxes, isComingSoon: false },
   { name: 'Incentives SPV Internal', icon: Coins, isComingSoon: false },
   { name: 'Incentives SPV Exclusive', icon: Crown, isComingSoon: false },
   { name: 'Incentives SE', icon: UserCheck, isComingSoon: false },

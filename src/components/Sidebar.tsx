@@ -8,7 +8,7 @@ import { SIDEBAR_ITEMS } from "../constants";
 import { SidebarMenu } from "../types";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft, ChevronRight, ChevronDown, Coins, Package } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Coins, Package, Boxes } from "lucide-react";
 
 interface SidebarProps {
   activeMenu: SidebarMenu;
@@ -19,21 +19,27 @@ interface SidebarProps {
 
 export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggleCollapse }: SidebarProps) {
   const [isIncentivesExpanded, setIsIncentivesExpanded] = useState(true);
+  const [isStockExpanded, setIsStockExpanded] = useState(true);
 
   useEffect(() => {
     if (["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE", "Incentives Pertinggal"].includes(activeMenu)) {
       setIsIncentivesExpanded(true);
     }
+    if (["Stock National", "Stock Cabang"].includes(activeMenu)) {
+      setIsStockExpanded(true);
+    }
   }, [activeMenu]);
 
   const isAnySubItemActive = ["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE", "Incentives Pertinggal"].includes(activeMenu);
+  const isAnyStockSubItemActive = ["Stock National", "Stock Cabang"].includes(activeMenu);
 
   const menuStructure = useMemo<any[]>(() => {
     const sellIn = SIDEBAR_ITEMS.find(i => i.name === 'Sell In');
     const sellThrough = SIDEBAR_ITEMS.find(i => i.name === 'Sell Through');
     const sellOut = SIDEBAR_ITEMS.find(i => i.name === 'Sell Out');
     const categoryAnalysis = SIDEBAR_ITEMS.find(i => i.name === 'Category Analysis');
-    const stockAnalysis = SIDEBAR_ITEMS.find(i => i.name === 'Stock Analysis');
+    const stockNational = SIDEBAR_ITEMS.find(i => i.name === 'Stock National');
+    const stockCabang = SIDEBAR_ITEMS.find(i => i.name === 'Stock Cabang');
     const spvInternal = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Internal');
     const spvExclusive = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Exclusive');
     const seIncentives = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SE');
@@ -48,7 +54,12 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
       sellThrough && { type: 'item' as const, item: sellThrough },
       sellOut && { type: 'item' as const, item: sellOut },
       categoryAnalysis && { type: 'item' as const, item: categoryAnalysis },
-      stockAnalysis && { type: 'item' as const, item: stockAnalysis },
+      (stockNational || stockCabang) && {
+        type: 'group' as const,
+        name: 'Stock Analysis',
+        icon: Boxes,
+        subItems: [stockNational, stockCabang].filter(Boolean)
+      },
       (spvInternal || spvExclusive || seIncentives || incentivesLeftBehind) && {
         type: 'group' as const,
         name: 'Incentives',
@@ -144,10 +155,11 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
               </button>
             );
           } else {
-            const isGroupActive = isAnySubItemActive;
-            const isGroupExpanded = isIncentivesExpanded;
-            const toggleGroup = () => setIsIncentivesExpanded(!isIncentivesExpanded);
-            const forceOpen = () => setIsIncentivesExpanded(true);
+            const isStockGroup = elem.name === 'Stock Analysis';
+            const isGroupActive = isStockGroup ? isAnyStockSubItemActive : isAnySubItemActive;
+            const isGroupExpanded = isStockGroup ? isStockExpanded : isIncentivesExpanded;
+            const toggleGroup = () => isStockGroup ? setIsStockExpanded(!isStockExpanded) : setIsIncentivesExpanded(!isIncentivesExpanded);
+            const forceOpen = () => isStockGroup ? setIsStockExpanded(true) : setIsIncentivesExpanded(true);
             const GroupIcon = elem.icon;
 
             return (
@@ -213,7 +225,8 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
                           <button
                             type="button"
                             key={subItem.name}
-                            onClick={() => onMenuChange(subItem.name)}
+                            onClick={() => !subItem.isComingSoon && onMenuChange(subItem.name)}
+                            disabled={subItem.isComingSoon}
                             className={cn(
                               "w-full flex items-center rounded-xl transition-all duration-300 relative shrink-0 cursor-pointer",
                               isCollapsed 
@@ -221,7 +234,8 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
                                 : "px-4 py-2 text-xs font-bold",
                               isSubActive 
                                 ? "bg-blue-50 text-blue-700 shadow-sm" 
-                                : "text-slate-400 hover:bg-slate-50 hover:text-blue-600"
+                                : "text-slate-400 hover:bg-slate-50 hover:text-blue-600",
+                              subItem.isComingSoon && "opacity-30 cursor-not-allowed"
                             )}
                             title={subItem.name}
                           >
@@ -233,11 +247,22 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
                                     ? "EXC" 
                                     : subItem.name.includes("SE")
                                       ? "SE"
-                                      : "PTG"}
+                                      : subItem.name.includes("Pertinggal")
+                                        ? "PTG"
+                                        : subItem.name.includes("National")
+                                          ? "NAT"
+                                          : "CAB"}
                               </span>
                             ) : (
                               <span className="truncate text-left">{subItem.name}</span>
                             )}
+                            
+                            {!isCollapsed && subItem.isComingSoon && (
+                              <span className="ml-auto text-[8px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full uppercase font-black tracking-widest whitespace-nowrap">
+                                Soon
+                              </span>
+                            )}
+
                             {isSubActive && !isCollapsed && (
                               <motion.div
                                 layoutId="active-indicator-sub"

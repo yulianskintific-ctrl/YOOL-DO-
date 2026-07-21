@@ -121,7 +121,7 @@ export interface DashboardMetrics {
   topASM: string;
 }
 
-export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'Incentives Pertinggal' | 'PO Checker' | 'Program Tracker' | 'Product Catalog' | 'SKU Focus' | 'Category Analysis' | 'Stock Analysis';
+export type SidebarMenu = 'Sell In' | 'Sell Through' | 'Sell Out' | 'Incentives SPV Internal' | 'Incentives SPV Exclusive' | 'Incentives SE' | 'Incentives Pertinggal' | 'PO Checker' | 'Program Tracker' | 'Product Catalog' | 'SKU Focus' | 'Category Analysis' | 'Stock Analysis' | 'Stock National' | 'Stock Cabang';
 
 export interface StockAnalysisData {
   update_date?: string;

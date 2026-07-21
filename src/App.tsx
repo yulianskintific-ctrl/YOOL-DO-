@@ -512,7 +512,7 @@ export default function App() {
           <SKUFocusPage />
         ) : activeMenu === 'Category Analysis' ? (
           <CategoryAnalysisPage />
-        ) : activeMenu === 'Stock Analysis' ? (
+        ) : activeMenu === 'Stock Cabang' ? (
           <StockAnalysisPage />
         ) : activeMenu === 'Incentives Pertinggal' ? (
           <div className="space-y-6">
