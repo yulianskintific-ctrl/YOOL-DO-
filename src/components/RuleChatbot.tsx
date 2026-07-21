@@ -151,7 +151,7 @@ export default function RuleChatbot() {
                   <h3 className="text-xs font-semibold text-slate-800 tracking-wide">
                     Yool-Yool
                   </h3>
-                  <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wider">Asisten Virtual Ter-🔥💥🤯!</p>
+                  <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wider">Asisten Virtual!</p>
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
