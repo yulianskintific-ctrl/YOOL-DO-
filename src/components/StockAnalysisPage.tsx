@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import { StockAnalysisData } from "../types";
 import { fetchStockAnalysisData } from "../services/api";
-import { formatNumber } from "../lib/utils";
+import { formatNumber, cn } from "../lib/utils";
 import {
   Search,
   Filter,
@@ -31,8 +31,11 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   CheckCircle,
-  Truck
+  Truck,
+  Check,
+  X
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -60,6 +63,159 @@ const getBrandColor = (brand: string) => {
   return BRAND_COLORS[norm] || "#3b82f6";
 };
 
+const MultiSelect = ({
+  label,
+  value,
+  onChange,
+  options = [],
+  placeholder = ""
+}: {
+  label: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  options?: string[];
+  placeholder?: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery) return options;
+    return options.filter((opt) => (opt || "").toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [options, searchQuery]);
+
+  const toggleOption = (opt: string) => {
+    if (value.includes(opt)) {
+      onChange(value.filter((v) => v !== opt));
+    } else {
+      onChange([...value, opt]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    onChange(options);
+  };
+
+  const handleClearAll = () => {
+    onChange([]);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 flex-1 min-w-[180px] relative" ref={containerRef}>
+      <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 block mb-1.5">{label}</span>
+      
+      <button
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setSearchQuery("");
+        }}
+        className={cn(
+          "w-full flex items-center justify-between gap-2 text-xs bg-slate-50 border border-slate-100 hover:border-blue-500 hover:bg-white rounded-xl p-3 text-left transition-all cursor-pointer appearance-none shadow-sm",
+          isOpen && "border-blue-500 ring-4 ring-blue-50/50 bg-white"
+        )}
+      >
+        <span className="truncate pr-2 font-bold text-slate-700">
+          {value.length === 0 ? (placeholder || `All ${label}s`) : `${value.length} Selected`}
+        </span>
+        <ChevronDown size={14} className={cn("text-slate-400 transition-transform duration-300 shrink-0", isOpen && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 5, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute top-full left-0 w-full bg-white border border-slate-200 rounded-2xl shadow-xl z-[100] mt-1 p-2 max-h-[300px] flex flex-col overflow-hidden"
+          >
+            {options.length > 5 && (
+              <div className="p-2 border-b border-slate-100 flex items-center gap-1.5 bg-slate-50/50 rounded-lg mb-1 shrink-0">
+                <Search size={13} className="text-slate-400 shrink-0 ml-1" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full text-[11px] font-semibold text-slate-700 placeholder-slate-400 bg-transparent outline-none py-1"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")} 
+                    className="text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Top Actions: Select All & Clear */}
+            <div className="p-1.5 bg-slate-50/40 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0 rounded-lg mb-1">
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="text-[9.5px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest px-2.5 py-1 rounded-lg hover:bg-white transition-all cursor-pointer"
+              >
+                Select All
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="text-[9.5px] font-black text-slate-500 hover:text-slate-700 uppercase tracking-widest px-2.5 py-1 rounded-lg hover:bg-white transition-all cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto flex-1 space-y-0.5 custom-scrollbar pr-1">
+              {filteredOptions.length === 0 ? (
+                <div className="text-center py-4 text-[10.5px] font-medium text-slate-400">
+                  No items found
+                </div>
+              ) : (
+                filteredOptions.map((opt) => {
+                  const isSelected = value.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => toggleOption(opt)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[11px] font-bold transition-all text-left group cursor-pointer",
+                        isSelected 
+                          ? "bg-blue-50 text-blue-700" 
+                          : "text-slate-500 hover:bg-slate-50"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-md border flex items-center justify-center transition-all shrink-0",
+                        isSelected ? "bg-blue-600 border-blue-600" : "border-slate-200 bg-white group-hover:border-blue-300"
+                      )}>
+                        {isSelected && <Check size={10} className="text-white" />}
+                      </div>
+                      <span className="truncate">{opt || "Non-Dead Stock / Normal"}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export default function StockAnalysisPage() {
   const [rawData, setRawData] = useState<StockAnalysisData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,10 +224,10 @@ export default function StockAnalysisPage() {
   const [showScriptGuide, setShowScriptGuide] = useState(false);
 
   // Filters State
-  const [selectedBrand, setSelectedBrand] = useState<string>("All");
-  const [selectedDistributor, setSelectedDistributor] = useState<string>("All");
-  const [selectedDeadStock, setSelectedDeadStock] = useState<string>("All");
-  const [selectedWoiRemarks, setSelectedWoiRemarks] = useState<string>("All");
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedDistributors, setSelectedDistributors] = useState<string[]>([]);
+  const [selectedDeadStocks, setSelectedDeadStocks] = useState<string[]>([]);
+  const [selectedWoiRemarks, setSelectedWoiRemarks] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Pagination State
@@ -145,18 +301,18 @@ export default function StockAnalysisPage() {
   const processedData = useMemo(() => {
     let result = [...rawData];
 
-    // Dropdown Filters
-    if (selectedBrand !== "All") {
-      result = result.filter((item) => item.brand === selectedBrand);
+    // Dropdown Filters (Multiple Selection)
+    if (selectedBrands.length > 0) {
+      result = result.filter((item) => item.brand && selectedBrands.includes(item.brand.trim()));
     }
-    if (selectedDistributor !== "All") {
-      result = result.filter((item) => item.distributor === selectedDistributor);
+    if (selectedDistributors.length > 0) {
+      result = result.filter((item) => item.distributor && selectedDistributors.includes(item.distributor.trim()));
     }
-    if (selectedDeadStock !== "All") {
-      result = result.filter((item) => item.death_stock_flag === selectedDeadStock);
+    if (selectedDeadStocks.length > 0) {
+      result = result.filter((item) => selectedDeadStocks.includes((item.death_stock_flag || "").trim()));
     }
-    if (selectedWoiRemarks !== "All") {
-      result = result.filter((item) => item.remarks_woi === selectedWoiRemarks);
+    if (selectedWoiRemarks.length > 0) {
+      result = result.filter((item) => selectedWoiRemarks.includes((item.remarks_woi || "").trim()));
     }
 
     // Text Search (filters SKU, Item ID, or Distributor)
@@ -190,7 +346,7 @@ export default function StockAnalysisPage() {
     }
 
     return result;
-  }, [rawData, selectedBrand, selectedDistributor, selectedDeadStock, selectedWoiRemarks, searchQuery, sortField, sortDirection]);
+  }, [rawData, selectedBrands, selectedDistributors, selectedDeadStocks, selectedWoiRemarks, searchQuery, sortField, sortDirection]);
 
   // Aggregate stats for KPIs
   const kpiStats = useMemo(() => {
@@ -350,7 +506,7 @@ export default function StockAnalysisPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedBrand, selectedDistributor, selectedDeadStock, selectedWoiRemarks, searchQuery]);
+  }, [selectedBrands, selectedDistributors, selectedDeadStocks, selectedWoiRemarks, searchQuery]);
 
   // Excel Exporter using xlsx library
   const exportToExcel = () => {
@@ -466,76 +622,40 @@ export default function StockAnalysisPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Brand Dropdown */}
-          <div className="space-y-1.5">
-            <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 block mb-1.5">Brand</span>
-            <div className="relative">
-              <select
-                value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-100 hover:border-blue-500 hover:bg-white p-3 pr-8 rounded-xl text-xs font-bold text-slate-700 outline-none transition-all cursor-pointer appearance-none shadow-sm"
-              >
-                <option value="All">All Brands</option>
-                {filterOptions.brands.map((brand) => (
-                  <option key={brand} value={brand}>{brand}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="Brand"
+            value={selectedBrands}
+            onChange={setSelectedBrands}
+            options={filterOptions.brands}
+            placeholder="All Brands"
+          />
 
           {/* Distributor Dropdown */}
-          <div className="space-y-1.5">
-            <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 block mb-1.5">Distributor</span>
-            <div className="relative">
-              <select
-                value={selectedDistributor}
-                onChange={(e) => setSelectedDistributor(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-100 hover:border-blue-500 hover:bg-white p-3 pr-8 rounded-xl text-xs font-bold text-slate-700 outline-none transition-all cursor-pointer appearance-none shadow-sm"
-              >
-                <option value="All">All Distributors</option>
-                {filterOptions.distributors.map((dist) => (
-                  <option key={dist} value={dist}>{dist}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="Distributor"
+            value={selectedDistributors}
+            onChange={setSelectedDistributors}
+            options={filterOptions.distributors}
+            placeholder="All Distributors"
+          />
 
           {/* Dead Stock Dropdown */}
-          <div className="space-y-1.5">
-            <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 block mb-1.5">Dead Stock Status</span>
-            <div className="relative">
-              <select
-                value={selectedDeadStock}
-                onChange={(e) => setSelectedDeadStock(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-100 hover:border-blue-500 hover:bg-white p-3 pr-8 rounded-xl text-xs font-bold text-slate-700 outline-none transition-all cursor-pointer appearance-none shadow-sm"
-              >
-                <option value="All">All Statuses</option>
-                {filterOptions.deadStockFlags.map((flag) => (
-                  <option key={flag} value={flag}>{flag || "Non-Dead Stock"}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="Dead Stock Status"
+            value={selectedDeadStocks}
+            onChange={setSelectedDeadStocks}
+            options={filterOptions.deadStockFlags}
+            placeholder="All Statuses"
+          />
 
           {/* WOI Remarks Dropdown */}
-          <div className="space-y-1.5">
-            <span className="text-[9px] font-black tracking-wider uppercase text-slate-400 block mb-1.5">WOI Remarks</span>
-            <div className="relative">
-              <select
-                value={selectedWoiRemarks}
-                onChange={(e) => setSelectedWoiRemarks(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-100 hover:border-blue-500 hover:bg-white p-3 pr-8 rounded-xl text-xs font-bold text-slate-700 outline-none transition-all cursor-pointer appearance-none shadow-sm"
-              >
-                <option value="All">All Remarks</option>
-                {filterOptions.woiRemarks.map((rem) => (
-                  <option key={rem} value={rem}>{rem || "Normal WOI"}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={14} />
-            </div>
-          </div>
+          <MultiSelect
+            label="WOI Remarks"
+            value={selectedWoiRemarks}
+            onChange={setSelectedWoiRemarks}
+            options={filterOptions.woiRemarks}
+            placeholder="All Remarks"
+          />
 
           {/* Search Box */}
           <div className="space-y-1.5">
