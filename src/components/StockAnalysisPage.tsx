@@ -33,6 +33,7 @@ import {
   CheckCircle,
   Truck,
   Check,
+  Code,
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -237,6 +238,95 @@ export default function StockAnalysisPage() {
   // Sorting State
   const [sortField, setSortField] = useState<keyof StockAnalysisData | null>("stock_total");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  // Apps Script Guide Modal State
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+
+  const gasScriptCode = `function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Parameter ?sheet=NamaTab (Contoh: ?sheet=Stock%20Cabang atau ?sheet=National)
+  var sheetName = e && e.parameter && e.parameter.sheet ? e.parameter.sheet : "";
+  var sheet;
+  
+  if (sheetName) {
+    sheet = ss.getSheetByName(sheetName);
+  }
+  if (!sheet) {
+    sheet = ss.getActiveSheet() || ss.getSheets()[0];
+  }
+  
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return ContentService.createTextOutput(JSON.stringify([]))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  var headers = data[0];
+  var rows = data.slice(1);
+  var tz = ss.getSpreadsheetTimeZone();
+  
+  var result = rows.map(function(row) {
+    var obj = {};
+    var hasData = false;
+    
+    headers.forEach(function(header, i) {
+      if (!header) return;
+      
+      // Standarisasi key header
+      var rawKey = header.toString().trim();
+      var key = rawKey.toLowerCase().replace(/[\\s_\\-\\.\\(\\)]/g, '_');
+      
+      // Mapping Alias Kolom Stock Analysis / Stock Cabang
+      if (key.includes('update_date') || key.includes('tanggal') || key === 'date') key = 'update_date';
+      if (key.includes('distributor') || key.includes('distributor_name')) key = 'distributor';
+      if (key.includes('product_code') || key.includes('item_id') || key.includes('product_id') || key === 'item_code') key = 'item_id';
+      if (key === 'sku' || key.includes('sku_name') || key.includes('nama_barang') || key === 'product') key = 'sku';
+      if (key.includes('soh_qty') || key === 'soh' || key.includes('stock_on_hand')) key = 'soh_qty';
+      if (key.includes('in_transit') || key.includes('intransit') || key === 'transit') key = 'in_transit_stock_qty';
+      if (key.includes('avg_am') || key.includes('am_l3m')) key = 'avg_am_l3m_qty';
+      if (key.includes('last_month_st') || key.includes('lm_st')) key = 'last_month_st_qty';
+      if (key === 'brand' || key.includes('brand_of')) key = 'brand';
+      if (key.includes('avg_st') || key.includes('st_l3m')) key = 'avg_st_l3m';
+      if (key.includes('stock_total') || key.includes('total_stock') || key === 'total') key = 'stock_total';
+      if (key.includes('woi_st') || key === 'woi' || key.includes('woi_l3m')) key = 'woi_st_l3m';
+      if (key.includes('death_stock') || key.includes('dead_stock') || key.includes('deadstock')) key = 'death_stock_flag';
+      if (key.includes('remarks_woi') || key.includes('woi_remarks') || key === 'remarks') key = 'remarks_woi';
+      if (key.includes('po_remarks') || key.includes('po_remark')) key = 'po_remarks';
+      
+      // Mapping Alias Kolom Stock National
+      if (key.includes('jakarta')) key = 'jakarta_wh';
+      if (key.includes('surabaya')) key = 'surabaya_wh';
+      if (key.includes('makassar')) key = 'makassar_wh';
+      if (key.includes('kalimantan')) key = 'kalimantan_wh';
+      if (key.includes('national_stock') || key.includes('stock_national')) key = 'national_stock';
+      if (key.includes('supply_control') || key.includes('gt_status')) key = 'supply_control_status_gt';
+
+      var val = row[i];
+      if (val instanceof Date) {
+        val = Utilities.formatDate(val, tz, "MM/dd/yyyy");
+      }
+      if (val !== "" && val !== null && val !== undefined) {
+        hasData = true;
+      }
+      
+      obj[key] = val;
+    });
+    
+    return hasData ? obj : null;
+  }).filter(function(item) {
+    return item !== null;
+  });
+  
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+  const copyScriptToClipboard = () => {
+    navigator.clipboard.writeText(gasScriptCode);
+    setCopiedScript(true);
+    setTimeout(() => setCopiedScript(false), 3000);
+  };
 
   // Load Data
   const loadData = async (force = false) => {
@@ -588,6 +678,13 @@ export default function StockAnalysisPage() {
           <p className="text-slate-400 text-sm font-medium">Strategic supply chain tracking and Weeks of Inventory (WOI) analytics.</p>
         </div>
         <div className="flex items-center flex-wrap gap-3 w-full lg:w-auto">
+          <button
+            onClick={() => setShowGuideModal(true)}
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-all cursor-pointer"
+          >
+            <Code size={14} />
+            Apps Script Setup
+          </button>
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
@@ -1433,6 +1530,74 @@ export default function StockAnalysisPage() {
           </div>
         )}
       </section>
+
+      {/* Modal: Google Apps Script Code Instructions */}
+      <AnimatePresence>
+        {showGuideModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl relative space-y-5"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <Code size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">Google Apps Script Integration (Stock Analysis)</h3>
+                    <p className="text-xs text-slate-400 font-medium">Connect your Google Sheet for Stock Cabang &amp; Stock National</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGuideModal(false)}
+                  className="p-1.5 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-600 font-medium leading-relaxed">
+                <p>
+                  Gunakan kode Google Apps Script di bawah ini untuk menyelaraskan data <strong className="text-slate-900">Stock Cabang</strong> dan <strong className="text-slate-900">Stock National</strong> langsung dari Spreadsheet Anda:
+                </p>
+
+                <ol className="list-decimal pl-5 space-y-1.5 text-slate-700 font-semibold">
+                  <li>Buka Spreadsheet Stock Analysis Anda.</li>
+                  <li>Buka menu <strong className="text-slate-900">Extensions &gt; Apps Script</strong>.</li>
+                  <li>Hapus semua kode lama, lalu tempelkan kode revisi terbaru di bawah ini.</li>
+                  <li>Klik <strong className="text-slate-900">Deploy &gt; New Deployment</strong>. Pilih type <strong className="text-blue-600">Web App</strong>, ubah Who has access menjadi <strong className="text-blue-600">Anyone</strong>.</li>
+                  <li>Salin URL Web App hasil deploy ke environment variable / setting aplikasi.</li>
+                </ol>
+
+                <div className="relative mt-2">
+                  <pre className="bg-slate-900 text-slate-100 p-4 rounded-2xl text-[11px] font-mono overflow-x-auto custom-scrollbar leading-relaxed">
+                    {gasScriptCode}
+                  </pre>
+                  <button
+                    onClick={copyScriptToClipboard}
+                    className="absolute top-3 right-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold transition-all shadow cursor-pointer flex items-center gap-1.5"
+                  >
+                    {copiedScript ? <Check size={12} /> : <Code size={12} />}
+                    {copiedScript ? "Copied!" : "Copy Code"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex justify-end">
+                <button
+                  onClick={() => setShowGuideModal(false)}
+                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Tutup Panduan
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

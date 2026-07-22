@@ -24,6 +24,7 @@ import SKUFocusPage from "./components/SKUFocusPage";
 import IncentivesLeftBehind from "./components/IncentivesLeftBehind";
 import CategoryAnalysisPage from "./components/CategoryAnalysisPage";
 import StockAnalysisPage from "./components/StockAnalysisPage";
+import StockNationalPage from "./components/StockNationalPage";
 import RuleChatbot from "./components/RuleChatbot";
 
 export default function App() {
@@ -55,13 +56,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (activeMenu === 'Incentives SPV Internal') {
-      loadIncentivesData();
-    } else if (activeMenu === 'Incentives SPV Exclusive') {
-      loadExclusiveIncentivesData();
-    } else if (activeMenu === 'Incentives SE') {
-      loadSeIncentivesData();
-    } else if (activeMenu === 'Sell Out') {
+    if (activeMenu === 'Sell Out') {
       loadSellOutData();
     } else {
       const dashboardMenus: SidebarMenu[] = ['Sell In', 'Sell Through'];
@@ -468,13 +463,7 @@ export default function App() {
   }, [filteredData, activeMenu]);
 
   const handleSync = (force = true) => {
-    if (activeMenu === 'Incentives SPV Internal') {
-      loadIncentivesData(force);
-    } else if (activeMenu === 'Incentives SPV Exclusive') {
-      loadExclusiveIncentivesData(force);
-    } else if (activeMenu === 'Incentives SE') {
-      loadSeIncentivesData(force);
-    } else if (activeMenu === 'Sell Out') {
+    if (activeMenu === 'Sell Out') {
       loadSellOutData(force);
     } else {
       loadDashboardData(force);
@@ -512,7 +501,9 @@ export default function App() {
           <SKUFocusPage />
         ) : activeMenu === 'Category Analysis' ? (
           <CategoryAnalysisPage />
-        ) : activeMenu === 'Stock Cabang' ? (
+        ) : activeMenu === 'Stock National' ? (
+          <StockNationalPage />
+        ) : activeMenu === 'Stock Cabang' || activeMenu === 'Stock Analysis' ? (
           <StockAnalysisPage />
         ) : activeMenu === 'Incentives Pertinggal' ? (
           <div className="space-y-6">
@@ -644,30 +635,6 @@ export default function App() {
               <ContributionTable data={filteredData} mode={activeMenu} />
             </section>
           </>
-        ) : activeMenu === 'Incentives SPV Internal' ? (
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-1 bg-blue-600 rounded-full" />
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Incentives SPV Internal Performance</h3>
-            </div>
-            <IncentivesSPVTable data={filteredIncentivesData} />
-          </div>
-        ) : activeMenu === 'Incentives SPV Exclusive' ? (
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-1 bg-blue-600 rounded-full" />
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Incentives SPV Exclusive Performance</h3>
-            </div>
-            <IncentivesSPVExclusiveTable data={filteredExclusiveIncentivesData} />
-          </div>
-        ) : activeMenu === 'Incentives SE' ? (
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-1 bg-blue-600 rounded-full" />
-              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Incentives SE Performance</h3>
-            </div>
-            <IncentivesSETable data={seIncentivesData} />
-          </div>
         ) : activeMenu === 'Sell Out' ? null : (
           <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">

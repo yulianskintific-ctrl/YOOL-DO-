@@ -480,6 +480,89 @@ app.get("/api/stock-analysis", async (req, res) => {
   }
 });
 
+// API route to proxy Stock National records
+app.get("/api/stock-national", async (req, res) => {
+  const cacheKey = "stock-national";
+  try {
+    const STOCK_NATIONAL_SCRIPT_URL = process.env.STOCK_NATIONAL_SCRIPT_URL || process.env.STOCK_ANALYSIS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxnVHv-7mO5COA-PFSRn41MwRsODjJdb1v5xIrbROWPyXL9ZNeht_PYrx1CEHezA30m/exec";
+    if (!STOCK_NATIONAL_SCRIPT_URL || !STOCK_NATIONAL_SCRIPT_URL.startsWith("https://")) {
+      return res.json({
+        success: false,
+        isDemo: true,
+        message: "Stock National script URL is not configured. Using demo mode.",
+        data: []
+      });
+    }
+
+    const targetUrl = STOCK_NATIONAL_SCRIPT_URL.includes("?") ? `${STOCK_NATIONAL_SCRIPT_URL}&sheet=National` : `${STOCK_NATIONAL_SCRIPT_URL}?sheet=National`;
+    console.log(`[Proxy] Fetching Stock National data from GAS: ${targetUrl}`);
+    const response = await fetchWithRetry(targetUrl, {}, 1, 10000);
+    
+    if (response.status === 403) {
+      console.log("[Proxy Status] Stock National Google Apps Script returned status 403 (Forbidden).");
+      return res.json({
+        success: false,
+        errorType: "403_FORBIDDEN",
+        message: "Google Apps Script returned status 403. Please deploy with 'Who has access: Anyone' and 'Execute as: Me'.",
+        data: []
+      });
+    }
+
+    if (!response.ok) {
+      throw new Error(`Google Apps Script responder returned status: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    
+    if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html") || responseText.trim().startsWith("<")) {
+      console.log("[Proxy Status] Stock National Google Apps Script returned HTML instead of JSON.");
+      return res.json({
+        success: false,
+        errorType: "HTML_RESPONSE_EXCLUSION",
+        message: "Google Apps Script returned HTML (access restricted). Please redeploy the script set to: Execute as: 'Me' and Who has access: 'Anyone'.",
+        data: []
+      });
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.log("[Proxy Status] Failed to parse Stock National JSON response:", parseErr);
+      return res.json({
+        success: false,
+        errorType: "INVALID_JSON",
+        message: "Google Apps Script returned invalid JSON format. Please ensure your script returns JSON ContentService correctly.",
+        data: []
+      });
+    }
+
+    proxyCache[cacheKey] = data;
+
+    res.json({
+      success: true,
+      data: data
+    });
+  } catch (err: any) {
+    console.log(`[Proxy Status] Stock National fetch failure: ${err.message || err}`);
+    
+    if (proxyCache[cacheKey]) {
+      console.log(`[Proxy] Returning cached data for ${cacheKey} due to fetch error.`);
+      return res.json({
+        success: true,
+        data: proxyCache[cacheKey]
+      });
+    }
+
+    res.json({
+      success: false,
+      errorType: "FETCH_FAILURE",
+      message: err.message || "Failed to fetch Stock National data from script",
+      data: []
+    });
+  }
+});
+
 // API route to proxy SKU Focus records (modular & separate)
 app.get("/api/sku-focus", async (req, res) => {
   try {

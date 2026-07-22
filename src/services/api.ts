@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData, SKUFocusStoreData, SKUFocusSPVData, CategoryAnalysisData, StockAnalysisData } from "../types";
+import { SalesData, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData, SKUFocusStoreData, SKUFocusSPVData, CategoryAnalysisData, StockAnalysisData, StockNationalData } from "../types";
 
 /**
  * SALIN & TEMPEL KODE INI KE GOOGLE APPS SCRIPT:
@@ -2227,6 +2227,299 @@ export function generateMockStockAnalysisData(): StockAnalysisData[] {
       death_stock_flag: "Dead Stock",
       remarks_woi: "-",
       po_remarks: "Stop PO"
+    }
+  ];
+}
+
+export const STOCK_NATIONAL_SCRIPT_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_STOCK_NATIONAL_SCRIPT_URL) || "https://script.google.com/macros/s/AKfycbxnVHv-7mO5COA-PFSRn41MwRsODjJdb1v5xIrbROWPyXL9ZNeht_PYrx1CEHezA30m/exec";
+
+let cachedStockNationalData: StockNationalData[] | null = null;
+let lastStockNationalFetchTime = 0;
+
+export async function fetchStockNationalData(forceRefresh = false): Promise<StockNationalData[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedStockNationalData && (now - lastStockNationalFetchTime < CACHE_DURATION)) {
+    console.log("Returning cached Stock National data");
+    return cachedStockNationalData;
+  }
+
+  let rawData: any = null;
+  let lastErrorMessage = "";
+
+  // 1. First attempt: fetch via local Node proxy route /api/stock-national
+  try {
+    const response = await fetch(`/api/stock-national`);
+    if (response.ok) {
+      const json = await response.json();
+      if (json && json.success !== false) {
+        rawData = json;
+      } else {
+        lastErrorMessage = json?.message || "GAS proxy returned success: false or invalid response.";
+        console.log("GAS proxy returned success: false or invalid response for Stock National:", lastErrorMessage);
+      }
+    } else {
+      lastErrorMessage = `Local proxy returned status ${response.status}`;
+      console.log(`Local proxy returned status ${response.status} for Stock National. Trying direct browser fetch.`);
+    }
+  } catch (proxyError: any) {
+    lastErrorMessage = proxyError?.message || String(proxyError);
+    console.log("Proxy fetch nested error for Stock National:", proxyError);
+  }
+
+  // 2. Second attempt: fallback to direct GAS browser fetch with sheet parameter
+  const scriptUrl = STOCK_NATIONAL_SCRIPT_URL;
+  if (!rawData && scriptUrl && scriptUrl.startsWith("https://") && !scriptUrl.includes("placeholder")) {
+    try {
+      const targetUrl = scriptUrl.includes("?") ? `${scriptUrl}&sheet=National` : `${scriptUrl}?sheet=National`;
+      console.log("Attempting direct browser fetch for Stock National from:", targetUrl);
+      const response = await fetch(targetUrl);
+      if (response.ok) {
+        rawData = await response.json();
+        console.log("Direct browser fetch for Stock National succeeded!");
+      } else {
+        lastErrorMessage = `Direct fetch returned status: ${response.status}`;
+        throw new Error(lastErrorMessage);
+      }
+    } catch (directError: any) {
+      lastErrorMessage = directError?.message || String(directError);
+      console.log("Direct browser fetch for Stock National failed:", directError);
+    }
+  }
+
+  // 3. Map retrieved JSON payload
+  if (rawData) {
+    try {
+      const payloadObj = (rawData && rawData.success === true && rawData.data) ? rawData.data : rawData;
+
+      let arrayData: any[] = [];
+      if (Array.isArray(payloadObj)) {
+        arrayData = payloadObj;
+      } else if (payloadObj && typeof payloadObj === "object") {
+        if (Array.isArray(payloadObj.data)) {
+          arrayData = payloadObj.data;
+        } else if (Array.isArray(payloadObj.rows)) {
+          arrayData = payloadObj.rows;
+        } else if (Array.isArray(payloadObj.records)) {
+          arrayData = payloadObj.records;
+        } else {
+          const possibleArray = Object.values(payloadObj).find(val => Array.isArray(val)) as any[];
+          if (possibleArray) {
+            arrayData = possibleArray;
+          }
+        }
+      }
+
+      if (arrayData.length > 0) {
+        console.log("Fetched Stock National records:", arrayData.length);
+
+        const mappedData = arrayData.map((item: any) => {
+          const itemNormalized: Record<string, any> = {};
+          for (const k of Object.keys(item)) {
+            const cleanK = k.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+            itemNormalized[cleanK] = item[k];
+          }
+
+          const findString = (exactAndAliases: string[], defaultValue = ""): string => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                return String(itemNormalized[cleanK]).trim() || defaultValue;
+              }
+            }
+            return defaultValue;
+          };
+
+          const findNumber = (exactAndAliases: string[], defaultValue = 0): number => {
+            for (const key of exactAndAliases) {
+              const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
+                const num = parseFloat(String(itemNormalized[cleanK]).replace(/[^0-9\.\-]/g, ""));
+                return isNaN(num) ? defaultValue : num;
+              }
+            }
+            return defaultValue;
+          };
+
+          const jkt = findNumber(["jakartawh", "jakarta_wh", "whjakarta", "jakarta", "wh_jakarta"]);
+          const sby = findNumber(["surabayawh", "surabaya_wh", "whsurabaya", "surabaya", "wh_surabaya"]);
+          const mks = findNumber(["makassarwh", "makassar_wh", "whmakassar", "makassar", "wh_makassar"]);
+          const kal = findNumber(["kalimantanwh", "kalimantan_wh", "whkalimantan", "kalimantan", "wh_kalimantan"]);
+          
+          let totalNat = findNumber(["nationalstock", "national_stock", "stocknational", "totalnational", "total_stock"]);
+          if (totalNat === 0 && (jkt + sby + mks + kal > 0)) {
+            totalNat = jkt + sby + mks + kal;
+          }
+
+          return {
+            brand: findString(["brand", "brand_of", "brandname"]),
+            sku_number: findString(["skunumber", "sku_number", "skunum", "productcode", "itemid"]),
+            sku: findString(["sku", "skuname", "product", "nama_barang"]),
+            jakarta_wh: jkt,
+            surabaya_wh: sby,
+            makassar_wh: mks,
+            kalimantan_wh: kal,
+            national_stock: totalNat,
+            supply_control_status_gt: findString(["supplycontrolstatusgt", "supply_control_status_gt", "supply_control_status", "status", "supplycontrolstatus"]),
+            remarks: findString(["remarks", "remark", "note", "notes"]),
+            _isFallback: false
+          };
+        });
+
+        cachedStockNationalData = mappedData;
+        lastStockNationalFetchTime = now;
+        return mappedData;
+      }
+    } catch (parseErr: any) {
+      console.log("Failed to parse retrieved Stock National data, falling back to mock:", parseErr);
+      if (forceRefresh) {
+        throw new Error(`Data parsing error: ${parseErr?.message || parseErr}`);
+      }
+    }
+  }
+
+  if (forceRefresh) {
+    throw new Error(lastErrorMessage || "Failed to sync spreadsheet. Connection failed or Google Apps Script returned invalid response.");
+  }
+
+  // Fallback to High-Fidelity Mock
+  console.log("Using High-Fidelity local mock Stock National data");
+  const mockData = generateMockStockNationalData();
+  cachedStockNationalData = mockData;
+  lastStockNationalFetchTime = now;
+  return mockData;
+}
+
+export function generateMockStockNationalData(): StockNationalData[] {
+  return [
+    {
+      brand: "FACERINNA",
+      sku_number: "FJM020001",
+      sku: "FACERINNA 2% NIACINAMIDE POWER BRIGHT CLEANSER 100ML",
+      jakarta_wh: 1250,
+      surabaya_wh: 840,
+      makassar_wh: 420,
+      kalimantan_wh: 610,
+      national_stock: 3120,
+      supply_control_status_gt: "Normal",
+      remarks: "Sufficient Inventory",
+      _isFallback: true
+    },
+    {
+      brand: "FACERINNA",
+      sku_number: "FFC001001",
+      sku: "FACERINNA NIACINAMIDE BRIGHTENING SERUM SUNSCREEN SPF 50 50ML",
+      jakarta_wh: 340,
+      surabaya_wh: 120,
+      makassar_wh: 80,
+      kalimantan_wh: 95,
+      national_stock: 635,
+      supply_control_status_gt: "Low Stock Risk",
+      remarks: "Prioritize PO Allocation",
+      _isFallback: true
+    },
+    {
+      brand: "FACERINNA",
+      sku_number: "FJH018001",
+      sku: "FACERINNA 10% NIACINAMIDE 3% TXA BRIGHT DARK SPOT SERUM 30ML",
+      jakarta_wh: 2100,
+      surabaya_wh: 1650,
+      makassar_wh: 980,
+      kalimantan_wh: 1120,
+      national_stock: 5850,
+      supply_control_status_gt: "Overstock",
+      remarks: "Hold New PO",
+      _isFallback: true
+    },
+    {
+      brand: "SKINTIFIC",
+      sku_number: "SKT-CL-001",
+      sku: "SKINTIFIC 5X CERAMIDE LOW PH CLEANSER 80ML",
+      jakarta_wh: 4200,
+      surabaya_wh: 3100,
+      makassar_wh: 1850,
+      kalimantan_wh: 2300,
+      national_stock: 11450,
+      supply_control_status_gt: "Normal",
+      remarks: "Fast Mover",
+      _isFallback: true
+    },
+    {
+      brand: "SKINTIFIC",
+      sku_number: "SKT-MS-002",
+      sku: "SKINTIFIC 5X CERAMIDE BARRIER MOISTURE GEL 50G",
+      jakarta_wh: 5800,
+      surabaya_wh: 4500,
+      makassar_wh: 2600,
+      kalimantan_wh: 3100,
+      national_stock: 16000,
+      supply_control_status_gt: "Normal",
+      remarks: "High Demand",
+      _isFallback: true
+    },
+    {
+      brand: "SKINTIFIC",
+      sku_number: "SKT-SR-004",
+      sku: "SKINTIFIC 10% NIACINAMIDE BRIGHTENING SERUM 20ML",
+      jakarta_wh: 150,
+      surabaya_wh: 90,
+      makassar_wh: 40,
+      kalimantan_wh: 60,
+      national_stock: 340,
+      supply_control_status_gt: "Critical Low",
+      remarks: "Rush Reorder Required",
+      _isFallback: true
+    },
+    {
+      brand: "GLAD2GLOW",
+      sku_number: "G2G-MS-001",
+      sku: "GLAD2GLOW CENTELLA ALLANTOIN SOOTHING GEL MOISTURIZER 55G",
+      jakarta_wh: 3200,
+      surabaya_wh: 2400,
+      makassar_wh: 1150,
+      kalimantan_wh: 1800,
+      national_stock: 8550,
+      supply_control_status_gt: "Normal",
+      remarks: "Stable Buffer",
+      _isFallback: true
+    },
+    {
+      brand: "GLAD2GLOW",
+      sku_number: "G2G-CL-003",
+      sku: "GLAD2GLOW BLUEBERRY 5% CERAMIDE CLEANSER 120ML",
+      jakarta_wh: 1900,
+      surabaya_wh: 1450,
+      makassar_wh: 820,
+      kalimantan_wh: 940,
+      national_stock: 5110,
+      supply_control_status_gt: "Normal",
+      remarks: "Optimal Stock Level",
+      _isFallback: true
+    },
+    {
+      brand: "TIMEPHORIA",
+      sku_number: "TMP-PM-001",
+      sku: "TIMEPHORIA VELVET LIP MATTE FLUID 01 PEACH",
+      jakarta_wh: 880,
+      surabaya_wh: 620,
+      makassar_wh: 310,
+      kalimantan_wh: 450,
+      national_stock: 2260,
+      supply_control_status_gt: "Normal",
+      remarks: "Moderate Velocity",
+      _isFallback: true
+    },
+    {
+      brand: "TIMEPHORIA",
+      sku_number: "TMP-PM-002",
+      sku: "TIMEPHORIA VELVET LIP MATTE FLUID 02 ROSE",
+      jakarta_wh: 120,
+      surabaya_wh: 70,
+      makassar_wh: 35,
+      kalimantan_wh: 45,
+      national_stock: 270,
+      supply_control_status_gt: "Critical Low",
+      remarks: "Stockout Imminent",
+      _isFallback: true
     }
   ];
 }

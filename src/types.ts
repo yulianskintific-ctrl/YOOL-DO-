@@ -144,6 +144,20 @@ export interface StockAnalysisData {
   _isFallback?: boolean;
 }
 
+export interface StockNationalData {
+  brand: string;
+  sku_number: string;
+  sku: string;
+  jakarta_wh: number;
+  surabaya_wh: number;
+  makassar_wh: number;
+  kalimantan_wh: number;
+  national_stock: number;
+  supply_control_status_gt: string;
+  remarks: string;
+  _isFallback?: boolean;
+}
+
 export interface SKUFocusStoreData {
   region: string;
   distributor_name: string;

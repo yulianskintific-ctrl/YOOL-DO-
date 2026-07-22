@@ -18,19 +18,14 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggleCollapse }: SidebarProps) {
-  const [isIncentivesExpanded, setIsIncentivesExpanded] = useState(true);
   const [isStockExpanded, setIsStockExpanded] = useState(true);
 
   useEffect(() => {
-    if (["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE", "Incentives Pertinggal"].includes(activeMenu)) {
-      setIsIncentivesExpanded(true);
-    }
     if (["Stock National", "Stock Cabang"].includes(activeMenu)) {
       setIsStockExpanded(true);
     }
   }, [activeMenu]);
 
-  const isAnySubItemActive = ["Incentives SPV Internal", "Incentives SPV Exclusive", "Incentives SE", "Incentives Pertinggal"].includes(activeMenu);
   const isAnyStockSubItemActive = ["Stock National", "Stock Cabang"].includes(activeMenu);
 
   const menuStructure = useMemo<any[]>(() => {
@@ -40,9 +35,6 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
     const categoryAnalysis = SIDEBAR_ITEMS.find(i => i.name === 'Category Analysis');
     const stockNational = SIDEBAR_ITEMS.find(i => i.name === 'Stock National');
     const stockCabang = SIDEBAR_ITEMS.find(i => i.name === 'Stock Cabang');
-    const spvInternal = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Internal');
-    const spvExclusive = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SPV Exclusive');
-    const seIncentives = SIDEBAR_ITEMS.find(i => i.name === 'Incentives SE');
     const incentivesLeftBehind = SIDEBAR_ITEMS.find(i => i.name === 'Incentives Pertinggal');
     const poChecker = SIDEBAR_ITEMS.find(i => i.name === 'PO Checker');
     const programTracker = SIDEBAR_ITEMS.find(i => i.name === 'Program Tracker');
@@ -60,12 +52,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
         icon: Boxes,
         subItems: [stockNational, stockCabang].filter(Boolean)
       },
-      (spvInternal || spvExclusive || seIncentives || incentivesLeftBehind) && {
-        type: 'group' as const,
-        name: 'Incentives',
-        icon: Coins,
-        subItems: [spvInternal, spvExclusive, seIncentives, incentivesLeftBehind].filter(Boolean)
-      },
+      incentivesLeftBehind && { type: 'item' as const, item: incentivesLeftBehind },
       skuList && { type: 'item' as const, item: skuList },
       skuFocus && { type: 'item' as const, item: skuFocus },
       poChecker && { type: 'item' as const, item: poChecker },
@@ -155,11 +142,10 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
               </button>
             );
           } else {
-            const isStockGroup = elem.name === 'Stock Analysis';
-            const isGroupActive = isStockGroup ? isAnyStockSubItemActive : isAnySubItemActive;
-            const isGroupExpanded = isStockGroup ? isStockExpanded : isIncentivesExpanded;
-            const toggleGroup = () => isStockGroup ? setIsStockExpanded(!isStockExpanded) : setIsIncentivesExpanded(!isIncentivesExpanded);
-            const forceOpen = () => isStockGroup ? setIsStockExpanded(true) : setIsIncentivesExpanded(true);
+            const isGroupActive = isAnyStockSubItemActive;
+            const isGroupExpanded = isStockExpanded;
+            const toggleGroup = () => setIsStockExpanded(!isStockExpanded);
+            const forceOpen = () => setIsStockExpanded(true);
             const GroupIcon = elem.icon;
 
             return (
