@@ -395,9 +395,10 @@ app.get("/api/category-analysis", async (req, res) => {
   }
 });
 
-// API route to proxy Stock Analysis records
+// API route to proxy Stock Analysis / Stock Cabang records
 app.get("/api/stock-analysis", async (req, res) => {
-  const cacheKey = "stock-analysis";
+  const sheet = req.query.sheet ? String(req.query.sheet) : "Stock Cabang";
+  const cacheKey = `stock-analysis-${sheet}`;
   try {
     const STOCK_ANALYSIS_SCRIPT_URL = process.env.STOCK_ANALYSIS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxnVHv-7mO5COA-PFSRn41MwRsODjJdb1v5xIrbROWPyXL9ZNeht_PYrx1CEHezA30m/exec";
     if (!STOCK_ANALYSIS_SCRIPT_URL || !STOCK_ANALYSIS_SCRIPT_URL.startsWith("https://")) {
@@ -409,8 +410,11 @@ app.get("/api/stock-analysis", async (req, res) => {
       });
     }
 
-    console.log(`[Proxy] Fetching Stock Analysis data from GAS: ${STOCK_ANALYSIS_SCRIPT_URL}`);
-    const response = await fetchWithRetry(STOCK_ANALYSIS_SCRIPT_URL, {}, 1, 10000);
+    const targetUrl = STOCK_ANALYSIS_SCRIPT_URL.includes("?")
+      ? `${STOCK_ANALYSIS_SCRIPT_URL}&sheet=${encodeURIComponent(sheet)}`
+      : `${STOCK_ANALYSIS_SCRIPT_URL}?sheet=${encodeURIComponent(sheet)}`;
+    console.log(`[Proxy] Fetching Stock Analysis data from GAS: ${targetUrl}`);
+    const response = await fetchWithRetry(targetUrl, {}, 1, 10000);
     
     // Check for 403 Forbidden
     if (response.status === 403) {

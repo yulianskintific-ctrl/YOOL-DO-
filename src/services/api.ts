@@ -1822,7 +1822,7 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
 
   // 1. First attempt: fetch via local Node proxy route
   try {
-    const response = await fetch(`/api/stock-analysis`);
+    const response = await fetch(`/api/stock-analysis?sheet=${encodeURIComponent("Stock Cabang")}`);
     if (response.ok) {
       const json = await response.json();
       if (json && json.success !== false) {
@@ -1844,8 +1844,11 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
   const scriptUrl = STOCK_ANALYSIS_SCRIPT_URL;
   if (!rawData && scriptUrl && scriptUrl.startsWith("https://") && !scriptUrl.includes("placeholder")) {
     try {
-      console.log("Attempting direct browser fetch for Stock Analysis from:", scriptUrl);
-      const response = await fetch(scriptUrl);
+      const targetUrl = scriptUrl.includes("?") 
+        ? `${scriptUrl}&sheet=${encodeURIComponent("Stock Cabang")}` 
+        : `${scriptUrl}?sheet=${encodeURIComponent("Stock Cabang")}`;
+      console.log("Attempting direct browser fetch for Stock Analysis from:", targetUrl);
+      const response = await fetch(targetUrl);
       if (response.ok) {
         rawData = await response.json();
         console.log("Direct browser fetch for Stock Analysis succeeded!");
@@ -1907,32 +1910,68 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
           const findNumber = (exactAndAliases: string[], defaultValue = 0): number => {
             for (const key of exactAndAliases) {
               const cleanK = key.toLowerCase().replace(/[\s_\-\.\(\)]/g, "");
-              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null) {
-                const num = parseFloat(String(itemNormalized[cleanK]).replace(/[^0-9\.\-]/g, ""));
+              if (itemNormalized[cleanK] !== undefined && itemNormalized[cleanK] !== null && itemNormalized[cleanK] !== "") {
+                const strVal = String(itemNormalized[cleanK]).replace(/,/g, ".");
+                const num = parseFloat(strVal.replace(/[^0-9\.\-]/g, ""));
                 return isNaN(num) ? defaultValue : num;
               }
             }
             return defaultValue;
           };
 
+          const soh_qty = findNumber(["sohqty", "soh_qty", "soh", "stock_on_hand", "soh_quantity"]);
+          const in_transit_stock_qty = findNumber(["intransitstockqty", "in_transit_stock_qty", "intransit", "in_transit_qty", "stock_in_transit"]);
+          let stock_total = findNumber(["stocktotal", "stock_total", "total_stock", "total_stok"]);
+          if (!stock_total || stock_total === 0) {
+            stock_total = soh_qty + in_transit_stock_qty;
+          }
+
+          const avg_st_l3m = findNumber(["avgstl3m", "avg_st_l3m", "avg_st", "st_l3m", "avg_sell_through", "avg_sell_through_l3m"]);
+
+          let woi_st_l3m = findNumber([
+            "woistl3m", "woi_st_l3m", "woi", "woi_l3m", "woist", "woi_st",
+            "woistl3mweeks", "woi_st_l3m_weeks", "woiweeks", "woi_weeks", "woiwks", "woi_wks",
+            "woistl3mwks", "woi_soh", "woisoh", "woitotal", "woi_total",
+            "weeksofinventory", "weeks_of_inventory", "weekofinventory", "week_of_inventory",
+            "wos", "weeks_of_supply", "woi_soh_qty", "woisohqty"
+          ]);
+
+          // Fallback calculation for WOI if sheet does not have WOI column or value is 0
+          if ((!woi_st_l3m || woi_st_l3m === 0) && stock_total > 0 && avg_st_l3m > 0) {
+            const weeklySt = avg_st_l3m / 4.3333;
+            woi_st_l3m = parseFloat((stock_total / weeklySt).toFixed(2));
+          } else if ((!woi_st_l3m || woi_st_l3m === 0) && stock_total > 0 && avg_st_l3m === 0) {
+            woi_st_l3m = 52; // Capped WOI for overstocked items with zero sales
+          } else if (stock_total === 0) {
+            woi_st_l3m = 0;
+          }
+
+          let remarks_woi = findString(["remarkswoi", "remarks_woi", "remarks", "woi_remarks", "remark_woi", "woi_remark", "woi_status"]);
+          if (!remarks_woi) {
+            if (woi_st_l3m > 24) remarks_woi = "High WOI";
+            else if (woi_st_l3m < 2 && stock_total < 10) remarks_woi = "OOS Risk";
+            else if (woi_st_l3m > 12) remarks_woi = "Warning WOI";
+            else remarks_woi = "Normal WOI";
+          }
+
           return {
-            update_date: findString(["updatedate", "update_date", "tanggal", "date"]),
-            distributor: findString(["distributor", "distributor_name", "distributorname"]),
-            product_code: findString(["productcode", "product_code", "productid", "itemid", "item_id"]),
-            item_id: findString(["itemid", "item_id", "productcode", "product_code"]),
-            sku: findString(["sku", "skuname", "sku_name", "nama_barang", "product"]),
-            soh_qty: findNumber(["sohqty", "soh_qty", "soh", "stock_on_hand"]),
-            in_transit_stock_qty: findNumber(["intransitstockqty", "in_transit_stock_qty", "intransit", "in_transit_qty"]),
+            update_date: findString(["updatedate", "update_date", "tanggal", "date", "update_tanggal"]),
+            distributor: findString(["distributor", "distributor_name", "distributorname", "nama_distributor", "cabang"]),
+            product_code: findString(["productcode", "product_code", "productid", "itemid", "item_id", "kode_produk", "kode_barang"]),
+            item_id: findString(["itemid", "item_id", "productcode", "product_code", "kode_produk"]),
+            sku: findString(["sku", "skuname", "sku_name", "nama_barang", "product", "nama_produk"]),
+            soh_qty,
+            in_transit_stock_qty,
             total_transit: findNumber(["totaltransit", "total_transit", "transit_total"]),
-            avg_am_l3m_qty: findNumber(["avgaml3mqty", "avg_am_l3m_qty", "avg_am"]),
-            last_month_st_qty: findNumber(["lastmonthstqty", "last_month_st_qty", "last_month_st"]),
-            brand: findString(["brand", "brand_of", "brandname"]),
-            avg_st_l3m: findNumber(["avgstl3m", "avg_st_l3m", "avg_st"]),
-            stock_total: findNumber(["stocktotal", "stock_total", "total_stock"]),
-            woi_st_l3m: findNumber(["woistl3m", "woi_st_l3m", "woi"]),
-            death_stock_flag: findString(["deathstockflag", "death_stock_flag", "deadstock"]),
-            remarks_woi: findString(["remarkswoi", "remarks_woi", "remarks"]),
-            po_remarks: findString(["poremarks", "po_remarks", "po_remark"])
+            avg_am_l3m_qty: findNumber(["avgaml3mqty", "avg_am_l3m_qty", "avg_am", "avg_am_l3m"]),
+            last_month_st_qty: findNumber(["lastmonthstqty", "last_month_st_qty", "last_month_st", "lm_st"]),
+            brand: findString(["brand", "brand_of", "brandname", "merk"]),
+            avg_st_l3m,
+            stock_total,
+            woi_st_l3m,
+            death_stock_flag: findString(["deathstockflag", "death_stock_flag", "deadstock", "dead_stock", "death_stock"]),
+            remarks_woi,
+            po_remarks: findString(["poremarks", "po_remarks", "po_remark", "remark_po"])
           };
         });
 

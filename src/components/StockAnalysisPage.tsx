@@ -289,7 +289,7 @@ export default function StockAnalysisPage() {
       if (key === 'brand' || key.includes('brand_of')) key = 'brand';
       if (key.includes('avg_st') || key.includes('st_l3m')) key = 'avg_st_l3m';
       if (key.includes('stock_total') || key.includes('total_stock') || key === 'total') key = 'stock_total';
-      if (key.includes('woi_st') || key === 'woi' || key.includes('woi_l3m')) key = 'woi_st_l3m';
+      if (key.includes('woi') || key.includes('wos') || key.includes('week') || key.includes('weeks')) key = 'woi_st_l3m';
       if (key.includes('death_stock') || key.includes('dead_stock') || key.includes('deadstock')) key = 'death_stock_flag';
       if (key.includes('remarks_woi') || key.includes('woi_remarks') || key === 'remarks') key = 'remarks_woi';
       if (key.includes('po_remarks') || key.includes('po_remark')) key = 'po_remarks';
@@ -491,26 +491,33 @@ export default function StockAnalysisPage() {
     return Object.values(brandMap).sort((a, b) => (b.soh + b.transit) - (a.soh + a.transit));
   }, [processedData]);
 
-  // Recharts Chart 2: Avg WOI and SOH ratio per Brand
+  // Recharts Chart 2: Weighted WOI per Brand
   const chartDataBrandWoi = useMemo(() => {
-    const brandWoiMap: Record<string, { name: string; sumWoi: number; count: number; avgWoi: number }> = {};
+    const brandWoiMap: Record<string, { name: string; totalStock: number; totalAvgSt: number }> = {};
 
     processedData.forEach((item) => {
       const brand = item.brand || "Unknown";
       if (!brandWoiMap[brand]) {
-        brandWoiMap[brand] = { name: brand, sumWoi: 0, count: 0, avgWoi: 0 };
+        brandWoiMap[brand] = { name: brand, totalStock: 0, totalAvgSt: 0 };
       }
-      if (item.woi_st_l3m !== undefined) {
-        brandWoiMap[brand].sumWoi += item.woi_st_l3m;
-        brandWoiMap[brand].count++;
-      }
+      brandWoiMap[brand].totalStock += item.stock_total || 0;
+      brandWoiMap[brand].totalAvgSt += item.avg_st_l3m || 0;
     });
 
     return Object.values(brandWoiMap)
-      .map((item) => ({
-        ...item,
-        avgWoi: item.count > 0 ? parseFloat((item.sumWoi / item.count).toFixed(1)) : 0
-      }))
+      .map((item) => {
+        let avgWoi = 0;
+        if (item.totalAvgSt > 0) {
+          const weeklySt = item.totalAvgSt / 4.3333;
+          avgWoi = parseFloat((item.totalStock / weeklySt).toFixed(1));
+        } else if (item.totalStock > 0) {
+          avgWoi = 52;
+        }
+        return {
+          name: item.name,
+          avgWoi
+        };
+      })
       .sort((a, b) => b.avgWoi - a.avgWoi);
   }, [processedData]);
 
@@ -527,12 +534,12 @@ export default function StockAnalysisPage() {
     const uniqueBrands = Array.from(brandsSet).sort();
     const uniqueDistributors = Array.from(distributorsSet).sort();
 
-    const matrix: Record<string, Record<string, { totalStock: number; woiSum: number; woiCount: number }>> = {};
+    const matrix: Record<string, Record<string, { totalStock: number; totalAvgSt: number; hasItems: boolean }>> = {};
 
     uniqueDistributors.forEach((dist) => {
       matrix[dist] = {};
       uniqueBrands.forEach((br) => {
-        matrix[dist][br] = { totalStock: 0, woiSum: 0, woiCount: 0 };
+        matrix[dist][br] = { totalStock: 0, totalAvgSt: 0, hasItems: false };
       });
     });
 
@@ -541,10 +548,8 @@ export default function StockAnalysisPage() {
       const br = item.brand?.trim();
       if (dist && br && matrix[dist] && matrix[dist][br]) {
         matrix[dist][br].totalStock += item.stock_total || 0;
-        if (typeof item.woi_st_l3m === "number") {
-          matrix[dist][br].woiSum += item.woi_st_l3m;
-          matrix[dist][br].woiCount++;
-        }
+        matrix[dist][br].totalAvgSt += item.avg_st_l3m || 0;
+        matrix[dist][br].hasItems = true;
       }
     });
 
@@ -678,13 +683,6 @@ export default function StockAnalysisPage() {
           <p className="text-slate-400 text-sm font-medium">Strategic supply chain tracking and Weeks of Inventory (WOI) analytics.</p>
         </div>
         <div className="flex items-center flex-wrap gap-3 w-full lg:w-auto">
-          <button
-            onClick={() => setShowGuideModal(true)}
-            className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-all cursor-pointer"
-          >
-            <Code size={14} />
-            Apps Script Setup
-          </button>
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
@@ -1024,7 +1022,7 @@ export default function StockAnalysisPage() {
                         <span className={`font-black px-2 py-0.5 rounded-full text-[10px] ${
                           woi > 24 ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"
                         }`}>
-                          {woi.toFixed(1)} Wks
+                          {woi >= 52 ? "> 52 Wks" : `${woi.toFixed(1)} Wks`}
                         </span>
                       </div>
                     </div>
@@ -1158,8 +1156,15 @@ export default function StockAnalysisPage() {
                         </td>
                         {heatmapData.brands.map((brand) => {
                           const cell = heatmapData.matrix[dist]?.[brand];
-                          const hasData = cell && cell.woiCount > 0;
-                          const avgWoi = hasData ? cell.woiSum / cell.woiCount : 0;
+                          const hasData = cell && cell.hasItems;
+                          let avgWoi = 0;
+                          if (hasData) {
+                            if (cell.totalAvgSt > 0) {
+                              avgWoi = cell.totalStock / (cell.totalAvgSt / 4.3333);
+                            } else if (cell.totalStock > 0) {
+                              avgWoi = 52;
+                            }
+                          }
                           
                           let bgClass = "bg-slate-50 text-slate-300";
                           let borderClass = "border-slate-100";
@@ -1180,9 +1185,9 @@ export default function StockAnalysisPage() {
                             <td key={brand} className="p-1 text-center">
                               <div
                                 className={`m-1 p-2 rounded-xl text-[10px] font-black border transition-all duration-200 cursor-help hover:scale-[1.04] hover:shadow-sm ${bgClass} ${borderClass}`}
-                                title={`${dist} • ${brand}\nAverage WOI: ${hasData ? avgWoi.toFixed(2) + " Weeks" : "No Data"}`}
+                                title={`${dist} • ${brand}\nWeighted WOI: ${hasData ? (avgWoi >= 52 ? "> 52 Weeks" : avgWoi.toFixed(2) + " Weeks") : "No Data"}`}
                               >
-                                {hasData ? `${avgWoi.toFixed(1)} Wks` : "-"}
+                                {hasData ? (avgWoi >= 52 ? "> 52 Wks" : `${avgWoi.toFixed(1)} Wks`) : "-"}
                               </div>
                             </td>
                           );
@@ -1440,7 +1445,7 @@ export default function StockAnalysisPage() {
                               : "bg-emerald-50 text-emerald-700"
                           }`}
                         >
-                          {typeof item.woi_st_l3m === "number" ? item.woi_st_l3m.toFixed(2) : "0.00"} Wks
+                          {typeof item.woi_st_l3m === "number" ? (item.woi_st_l3m >= 52 ? "> 52 Wks" : `${item.woi_st_l3m.toFixed(2)} Wks`) : "0.00 Wks"}
                         </span>
                       </td>
 
