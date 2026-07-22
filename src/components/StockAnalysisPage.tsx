@@ -511,7 +511,7 @@ export default function StockAnalysisPage() {
           const weeklySt = item.totalAvgSt / 4.3333;
           avgWoi = parseFloat((item.totalStock / weeklySt).toFixed(1));
         } else if (item.totalStock > 0) {
-          avgWoi = 52;
+          avgWoi = 99;
         }
         return {
           name: item.name,
@@ -1022,7 +1022,7 @@ export default function StockAnalysisPage() {
                         <span className={`font-black px-2 py-0.5 rounded-full text-[10px] ${
                           woi > 24 ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"
                         }`}>
-                          {woi >= 52 ? "> 52 Wks" : `${woi.toFixed(1)} Wks`}
+                          {woi.toFixed(1)} Wks
                         </span>
                       </div>
                     </div>
@@ -1162,7 +1162,7 @@ export default function StockAnalysisPage() {
                             if (cell.totalAvgSt > 0) {
                               avgWoi = cell.totalStock / (cell.totalAvgSt / 4.3333);
                             } else if (cell.totalStock > 0) {
-                              avgWoi = 52;
+                              avgWoi = 99;
                             }
                           }
                           
@@ -1185,9 +1185,9 @@ export default function StockAnalysisPage() {
                             <td key={brand} className="p-1 text-center">
                               <div
                                 className={`m-1 p-2 rounded-xl text-[10px] font-black border transition-all duration-200 cursor-help hover:scale-[1.04] hover:shadow-sm ${bgClass} ${borderClass}`}
-                                title={`${dist} • ${brand}\nWeighted WOI: ${hasData ? (avgWoi >= 52 ? "> 52 Weeks" : avgWoi.toFixed(2) + " Weeks") : "No Data"}`}
+                                title={`${dist} • ${brand}\nWeighted WOI: ${hasData ? avgWoi.toFixed(2) + " Weeks" : "No Data"}`}
                               >
-                                {hasData ? (avgWoi >= 52 ? "> 52 Wks" : `${avgWoi.toFixed(1)} Wks`) : "-"}
+                                {hasData ? `${avgWoi.toFixed(1)} Wks` : "-"}
                               </div>
                             </td>
                           );
@@ -1445,7 +1445,7 @@ export default function StockAnalysisPage() {
                               : "bg-emerald-50 text-emerald-700"
                           }`}
                         >
-                          {typeof item.woi_st_l3m === "number" ? (item.woi_st_l3m >= 52 ? "> 52 Wks" : `${item.woi_st_l3m.toFixed(2)} Wks`) : "0.00 Wks"}
+                          {typeof item.woi_st_l3m === "number" ? `${item.woi_st_l3m.toFixed(2)} Wks` : "0.00 Wks"}
                         </span>
                       </td>
 

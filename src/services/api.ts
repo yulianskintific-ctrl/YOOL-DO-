@@ -1941,7 +1941,7 @@ export async function fetchStockAnalysisData(forceRefresh = false): Promise<Stoc
             const weeklySt = avg_st_l3m / 4.3333;
             woi_st_l3m = parseFloat((stock_total / weeklySt).toFixed(2));
           } else if ((!woi_st_l3m || woi_st_l3m === 0) && stock_total > 0 && avg_st_l3m === 0) {
-            woi_st_l3m = 52; // Capped WOI for overstocked items with zero sales
+            woi_st_l3m = 99; // Fallback WOI for overstocked items with zero sales
           } else if (stock_total === 0) {
             woi_st_l3m = 0;
           }
