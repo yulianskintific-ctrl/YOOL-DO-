@@ -508,7 +508,7 @@ export default function App() {
         ) : activeMenu === 'Incentives Pertinggal' ? (
           <div className="space-y-6">
             <header className="mb-10 pb-8 border-b border-slate-50">
-              <h2 className="text-4xl font-black tracking-tight text-slate-900 mb-1">Incentives Tertinggal</h2>
+              <h2 className="text-4xl font-black tracking-tight text-slate-900 mb-1">Incentives Pertinggal</h2>
               <p className="text-slate-400 text-sm font-medium">Quick access spreadsheets for historical incentive distributions.</p>
             </header>
             <IncentivesLeftBehind />

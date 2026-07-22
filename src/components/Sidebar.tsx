@@ -29,6 +29,7 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
   const isAnyStockSubItemActive = ["Stock National", "Stock Cabang"].includes(activeMenu);
 
   const menuStructure = useMemo<any[]>(() => {
+    const kpiReview = SIDEBAR_ITEMS.find(i => i.name === 'KPI Review');
     const sellIn = SIDEBAR_ITEMS.find(i => i.name === 'Sell In');
     const sellThrough = SIDEBAR_ITEMS.find(i => i.name === 'Sell Through');
     const sellOut = SIDEBAR_ITEMS.find(i => i.name === 'Sell Out');
@@ -36,12 +37,15 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
     const stockNational = SIDEBAR_ITEMS.find(i => i.name === 'Stock National');
     const stockCabang = SIDEBAR_ITEMS.find(i => i.name === 'Stock Cabang');
     const incentivesLeftBehind = SIDEBAR_ITEMS.find(i => i.name === 'Incentives Pertinggal');
+    const distributorIncentives = SIDEBAR_ITEMS.find(i => i.name === 'Distributor Incentives');
     const poChecker = SIDEBAR_ITEMS.find(i => i.name === 'PO Checker');
     const programTracker = SIDEBAR_ITEMS.find(i => i.name === 'Program Tracker');
     const skuList = SIDEBAR_ITEMS.find(i => i.name === 'Product Catalog');
+    const msl = SIDEBAR_ITEMS.find(i => i.name === 'MSL');
     const skuFocus = SIDEBAR_ITEMS.find(i => i.name === 'SKU Focus');
 
     return [
+      kpiReview && { type: 'item' as const, item: kpiReview },
       sellIn && { type: 'item' as const, item: sellIn },
       sellThrough && { type: 'item' as const, item: sellThrough },
       sellOut && { type: 'item' as const, item: sellOut },
@@ -53,9 +57,11 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
         subItems: [stockNational, stockCabang].filter(Boolean)
       },
       incentivesLeftBehind && { type: 'item' as const, item: incentivesLeftBehind },
-      skuList && { type: 'item' as const, item: skuList },
-      skuFocus && { type: 'item' as const, item: skuFocus },
+      distributorIncentives && { type: 'item' as const, item: distributorIncentives },
       poChecker && { type: 'item' as const, item: poChecker },
+      skuList && { type: 'item' as const, item: skuList },
+      msl && { type: 'item' as const, item: msl },
+      skuFocus && { type: 'item' as const, item: skuFocus },
       programTracker && { type: 'item' as const, item: programTracker }
     ].filter(Boolean);
   }, []);

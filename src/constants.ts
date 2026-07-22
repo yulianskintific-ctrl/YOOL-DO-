@@ -18,10 +18,14 @@ import {
   ExternalLink,
   PieChart,
   Boxes,
-  MessageSquare
+  MessageSquare,
+  Award,
+  BadgePercent,
+  ListChecks
 } from "lucide-react";
 
 export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolean }[] = [
+  { name: 'KPI Review', icon: Award, isComingSoon: true },
   { name: 'Sell In', icon: BarChart3, isComingSoon: false },
   { name: 'Sell Through', icon: TrendingUp, isComingSoon: false },
   { name: 'Sell Out', icon: ShoppingBag, isComingSoon: false },
@@ -30,9 +34,11 @@ export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolea
   { name: 'Stock National', icon: Boxes, isComingSoon: false },
   { name: 'Stock Cabang', icon: Boxes, isComingSoon: false },
   { name: 'Incentives Pertinggal', icon: Coins, isComingSoon: false },
+  { name: 'Distributor Incentives', icon: BadgePercent, isComingSoon: true },
   { name: 'PO Checker', icon: ClipboardCheck, isComingSoon: true },
-  { name: 'Program Tracker', icon: Truck, isComingSoon: true },
   { name: 'Product Catalog', icon: Package, isComingSoon: false },
+  { name: 'MSL', icon: ListChecks, isComingSoon: true },
+  { name: 'Program Tracker', icon: Truck, isComingSoon: true },
   { name: 'SKU Focus', icon: Target, isComingSoon: false },
 ];
 
