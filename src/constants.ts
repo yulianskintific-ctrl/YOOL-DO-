@@ -33,17 +33,17 @@ export const VALID_USERS = [
   {
     username: "endini01",
     password: "eastkal123",
-    nickname: "Mba Endini"
+    nickname: "Endini"
   },
   {
     username: "adela01",
     password: "southkal123",
-    nickname: "Mas Adel"
+    nickname: "Adela"
   },
   {
     username: "gerald01",
     password: "westkal01",
-    nickname: "Bro Gerald"
+    nickname: "Gerald Hutomo"
   }
 ];
 
