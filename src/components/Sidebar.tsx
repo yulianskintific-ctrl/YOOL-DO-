@@ -5,19 +5,21 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { SIDEBAR_ITEMS } from "../constants";
-import { SidebarMenu } from "../types";
+import { SidebarMenu, User } from "../types";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft, ChevronRight, ChevronDown, Coins, Package, Boxes } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, Coins, Package, Boxes, LogOut, User as UserIcon } from "lucide-react";
 
 interface SidebarProps {
   activeMenu: SidebarMenu;
   onMenuChange: (menu: SidebarMenu) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  currentUser?: User | null;
+  onLogout?: () => void;
 }
 
-export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggleCollapse }: SidebarProps) {
+export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggleCollapse, currentUser, onLogout }: SidebarProps) {
   const [isStockExpanded, setIsStockExpanded] = useState(true);
 
   useEffect(() => {
@@ -273,7 +275,36 @@ export default function Sidebar({ activeMenu, onMenuChange, isCollapsed, onToggl
         })}
       </nav>
 
-      <div className={cn("p-6 border-t border-slate-50 text-slate-300 font-bold tracking-tight transition-all shrink-0", isCollapsed ? "text-center text-[8px]" : "text-[10px]")}>
+      {currentUser && (
+        <div className="p-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
+          <div className={cn("flex items-center gap-2.5", isCollapsed ? "justify-center" : "px-2 py-1")}>
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/30">
+              {currentUser.nickname.charAt(0).toUpperCase()}
+            </div>
+            {!isCollapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black text-slate-800 truncate">{currentUser.nickname}</p>
+                <p className="text-[10px] font-semibold text-slate-400 truncate">@{currentUser.username}</p>
+              </div>
+            )}
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className={cn(
+                  "text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg p-1.5 transition-all cursor-pointer",
+                  isCollapsed && "mt-1"
+                )}
+                title="Keluar / Logout"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className={cn("px-6 py-3 border-t border-slate-50 text-slate-300 font-bold tracking-tight transition-all shrink-0", isCollapsed ? "text-center text-[8px]" : "text-[10px]")}>
         {isCollapsed ? "© 26" : "© 2026 YOOL-DO! PLATFORM"}
       </div>
     </motion.div>

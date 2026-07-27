@@ -24,6 +24,29 @@ import {
   ListChecks
 } from "lucide-react";
 
+export const VALID_USERS = [
+  {
+    username: "yulian1",
+    password: "yulianpalingwuaoh",
+    nickname: "Yulian"
+  },
+  {
+    username: "endini01",
+    password: "eastkal123",
+    nickname: "Mba Endini"
+  },
+  {
+    username: "adela01",
+    password: "southkal123",
+    nickname: "Mas Adel"
+  },
+  {
+    username: "gerald01",
+    password: "westkal01",
+    nickname: "Bro Gerald"
+  }
+];
+
 export const SIDEBAR_ITEMS: { name: SidebarMenu; icon: any; isComingSoon: boolean }[] = [
   { name: 'KPI Review', icon: Award, isComingSoon: true },
   { name: 'Sell In', icon: BarChart3, isComingSoon: false },

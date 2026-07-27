@@ -10,11 +10,12 @@ import Filters from "./components/Filters";
 import { MainTrendChart, PerformanceBarChart, ComparisonLineChart, BrandDoughnutChart } from "./components/Charts";
 import RankingTable from "./components/RankingTable";
 import ContributionTable from "./components/ContributionTable";
-import { SalesData, FilterState, SidebarMenu, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData } from "./types";
+import { SalesData, FilterState, SidebarMenu, IncentiveSPVData, IncentiveSPVExclusiveData, IncentiveSEData, SellOutData, User } from "./types";
 import { fetchSalesData, fetchIncentiveSPVData, fetchIncentiveSPVExclusiveData, fetchIncentiveSEData, fetchSellOutData } from "./services/api";
 import { formatNumber, cn } from "./lib/utils";
 import { parse, format, eachMonthOfInterval } from "date-fns";
 import { Loader2, X, RefreshCw } from "lucide-react";
+import LoginPage from "./components/LoginPage";
 import IncentivesSPVTable from "./components/IncentivesSPVTable";
 import IncentivesSPVExclusiveTable from "./components/IncentivesSPVExclusiveTable";
 import IncentivesSETable from "./components/IncentivesSETable";
@@ -28,6 +29,28 @@ import StockNationalPage from "./components/StockNationalPage";
 import RuleChatbot from "./components/RuleChatbot";
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem("yool_do_user");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const handleLogin = (user: User) => {
+    localStorage.setItem("yool_do_user", JSON.stringify(user));
+    setCurrentUser(user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("yool_do_user");
+    setCurrentUser(null);
+  };
+
   const [data, setData] = useState<SalesData[]>([]);
   const [sellOutData, setSellOutData] = useState<SellOutData[]>([]);
   const [incentivesData, setIncentivesData] = useState<IncentiveSPVData[]>([]);
@@ -470,6 +493,10 @@ export default function App() {
     }
   };
 
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   return (
     <div className="bg-white min-h-screen text-slate-900 font-sans">
       <Sidebar 
@@ -477,6 +504,8 @@ export default function App() {
         onMenuChange={setActiveMenu} 
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
       
       <main className={cn("transition-all duration-500 p-8 max-w-[1500px] mx-auto", isSidebarCollapsed ? "pl-28" : "pl-72")}>
@@ -660,7 +689,7 @@ export default function App() {
           </div>
         </footer>
       </main>
-      <RuleChatbot />
+      <RuleChatbot currentUser={currentUser} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, ArrowRight, Sparkles, RefreshCw, Layers, X, MessageSquare } from "lucide-react";
+import { Bot, Send, User as UserIcon, ArrowRight, Sparkles, RefreshCw, Layers, X, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
+import { User as UserType } from "../types";
 
 interface Message {
   id: string;
@@ -11,20 +12,54 @@ interface Message {
   quickReplies?: { text: string; query: string }[];
 }
 
-export default function RuleChatbot() {
+interface RuleChatbotProps {
+  currentUser?: UserType | null;
+}
+
+export default function RuleChatbot({ currentUser }: RuleChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasNewMessage, setHasNewMessage] = useState(true); // Show a pulsing dot initially to catch attention
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      sender: "bot",
-      text: "Hmm... Hehe, halo Kak! 😉 Saya **Yool-Yool**, asisten virtual yang akan menemani Anda menjelajahi dashboard **YOOL-DO!** ini.\n\nAda hal menarik yang ingin Anda tanyakan seputar analisis penjualan, rumus insentif, atau kendala teknis? Silakan tanyakan saja, saya siap membantu dengan beberapa trik menarik. Hehe... 🍵😏",
-      timestamp: new Date(),
-      quickReplies: [
-        { text: "🤔 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
-      ]
+  const [messages, setMessages] = useState<Message[]>([]);
+  const prevUserRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (currentUser && currentUser.username !== prevUserRef.current) {
+      prevUserRef.current = currentUser.username;
+      
+      let greetingText = "";
+      switch (currentUser.username.toLowerCase()) {
+        case "yulian1":
+          greetingText = `🍵 "Ara ara... Selamat datang lagi, Mas Yulian. Hehe~ 😄 Hari ini kita bongkar insight apa ya? Semoga semua query berjalan mulus dan datanya membawa kabar baik. 🚀📊"`;
+          break;
+        case "endini01":
+          greetingText = `Halo, Mba Endini! 😊 Senang melihat Anda mampir lagi. Silakan jelajahi dashboard dulu ya, siapa tahu ada insight menarik yang sedang menunggu ditemukan. ✨📈`;
+          break;
+        case "adela01":
+          greetingText = `Wah, Mas Adel sudah datang. Hehe~ 😄 Semoga South Kal hari ini penuh angka hijau dan kabar baik. Yuk, kita lihat kejutan apa yang disiapkan dashboard. 🍀📊`;
+          break;
+        case "gerald01":
+          greetingText = `😎 Halo, Bro Gerald! 👋 Hari ini kita mengulik data yang mana dulu? Santai saja, semoga insight yang dicari langsung ketemu. 🔍✨`;
+          break;
+        default:
+          greetingText = `👋 "Halo, ${currentUser.nickname}! Selamat datang kembali. Semoga harimu menyenangkan. Yuk, kita cari insight baru hari ini! ✨📊"`;
+          break;
+      }
+
+      setMessages([
+        {
+          id: `welcome-${Date.now()}`,
+          sender: "bot",
+          text: greetingText,
+          timestamp: new Date(),
+          quickReplies: [
+            { text: "🤔 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
+          ]
+        }
+      ]);
+      setHasNewMessage(true);
+      setIsOpen(true);
     }
-  ]);
+  }, [currentUser]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -158,20 +193,45 @@ export default function RuleChatbot() {
               </div>
               <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setMessages([
-                    {
-                      id: `welcome-${Date.now()}`,
-                      sender: "bot",
-                      text: "Halo! Saya **Yool-Yool**, asisten virtual pintar Anda untuk platform **YOOL-DO!** .\n\nSilakan tanyakan hal-hal seputar dashboard, analisis penjualan, rumus insentif, atau kendala teknis kepada saya!",
-                      timestamp: new Date(),
-                      quickReplies: [
-                        { text: "📊 Rumus Insentif SPV", query: "Tolong jelaskan bagaimana Rumus Insentif SPV (Supervisor) dihitung." },
-                        { text: "⭐ Rumus Insentif SE", query: "Tolong jelaskan bagaimana Rumus Insentif SE (Sales Executive) dihitung." },
-                        { text: "🔄 Cara Atasi Error 403 / Sync", query: "Bagaimana cara mengatasi error sinkronisasi atau Error 403 Forbidden pada Google Sheets?" },
-                        { text: "💡 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
-                      ]
+                  onClick={() => {
+                    let greetingText = "";
+                    if (currentUser) {
+                      switch (currentUser.username.toLowerCase()) {
+                        case "yulian1":
+                          greetingText = `🍵 "Ara ara... Selamat datang lagi, Mas Yulian. Hehe~ 😄 Hari ini kita bongkar insight apa ya? Semoga semua query berjalan mulus dan datanya membawa kabar baik. 🚀📊"`;
+                          break;
+                        case "endini01":
+                          greetingText = `Halo, Mba Endini! 😊 Senang melihat Anda mampir lagi. Silakan jelajahi dashboard dulu ya, siapa tahu ada insight menarik yang sedang menunggu ditemukan. ✨📈`;
+                          break;
+                        case "adela01":
+                          greetingText = `Wah, Mas Adel sudah datang. Hehe~ 😄 Semoga South Kal hari ini penuh angka hijau dan kabar baik. Yuk, kita lihat kejutan apa yang disiapkan dashboard. 🍀📊`;
+                          break;
+                        case "gerald01":
+                          greetingText = `😎 Halo, Bro Gerald! 👋 Hari ini kita mengulik data yang mana dulu? Santai saja, semoga insight yang dicari langsung ketemu. 🔍✨`;
+                          break;
+                        default:
+                          greetingText = `👋 "Halo, ${currentUser.nickname}! Selamat datang kembali. Semoga harimu menyenangkan. Yuk, kita cari insight baru hari ini! ✨📊"`;
+                          break;
+                      }
+                    } else {
+                      greetingText = "Halo! Saya **Yool-Yool**, asisten virtual Anda.";
                     }
-                  ])}
+
+                    setMessages([
+                      {
+                        id: `welcome-${Date.now()}`,
+                        sender: "bot",
+                        text: greetingText,
+                        timestamp: new Date(),
+                        quickReplies: [
+                          { text: "📊 Rumus Insentif SPV", query: "Tolong jelaskan bagaimana Rumus Insentif SPV (Supervisor) dihitung." },
+                          { text: "⭐ Rumus Insentif SE", query: "Tolong jelaskan bagaimana Rumus Insentif SE (Sales Executive) dihitung." },
+                          { text: "🔄 Cara Atasi Error 403 / Sync", query: "Bagaimana cara mengatasi error sinkronisasi atau Error 403 Forbidden pada Google Sheets?" },
+                          { text: "💡 Apa beda Sell In/Through/Out?", query: "Apa perbedaan antara Sell In, Sell Through, dan Sell Out?" }
+                        ]
+                      }
+                    ]);
+                  }}
                   className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
                   title="Reset Percakapan"
                 >
@@ -192,7 +252,7 @@ export default function RuleChatbot() {
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex items-start gap-2.5 ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
                   <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border ${msg.sender === "bot" ? "bg-blue-50 text-blue-500 border-blue-100/50" : "bg-slate-50 text-slate-500 border-slate-100"}`}>
-                    {msg.sender === "bot" ? <Bot size={12} /> : <User size={12} />}
+                    {msg.sender === "bot" ? <Bot size={12} /> : <UserIcon size={12} />}
                   </div>
 
                   <div className="max-w-[75%] space-y-2">
